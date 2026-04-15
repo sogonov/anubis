@@ -16,6 +16,8 @@ import sgnv.anubis.app.service.StealthState
 import sgnv.anubis.app.service.StealthVpnService
 import sgnv.anubis.app.service.VpnMonitorService
 import sgnv.anubis.app.shizuku.ShizukuStatus
+import sgnv.anubis.app.update.UpdateChecker
+import sgnv.anubis.app.update.UpdateInfo
 import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientManager
 import sgnv.anubis.app.vpn.VpnClientType
@@ -82,6 +84,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _dangerousAppWarning = MutableStateFlow<String?>(null)
     val dangerousAppWarning: StateFlow<String?> = _dangerousAppWarning
 
+    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
+    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo
+
+    private val _updateCheckEnabled = MutableStateFlow(true)
+    val updateCheckEnabled: StateFlow<Boolean> = _updateCheckEnabled
+
+    private val _updateCheckInProgress = MutableStateFlow(false)
+    val updateCheckInProgress: StateFlow<Boolean> = _updateCheckInProgress
+
     init {
         vpnClientManager.startMonitoringVpn()
         refreshVpnClients()
@@ -92,6 +103,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeVpnState()
         loadBackgroundMonitoring()
         checkDangerousApps()
+        loadUpdateCheckPref()
+        autoCheckForUpdates()
     }
 
     /** Watch VPN state changes — auto-freeze, sync state, refresh network */
@@ -417,6 +430,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             SelectedVpnClient.fromKnown(VpnClientType.V2RAY_NG)
         }
+    }
+
+    private fun loadUpdateCheckPref() {
+        _updateCheckEnabled.value = UpdateChecker.isEnabled(getApplication())
+    }
+
+    fun setUpdateCheckEnabled(enabled: Boolean) {
+        _updateCheckEnabled.value = enabled
+        UpdateChecker.setEnabled(getApplication(), enabled)
+    }
+
+    private fun autoCheckForUpdates() {
+        if (!UpdateChecker.isEnabled(getApplication())) return
+        viewModelScope.launch {
+            delay(5000)
+            val info = UpdateChecker.check(getApplication(), force = false) ?: return@launch
+            if (UpdateChecker.shouldNotify(getApplication(), info)) {
+                _updateInfo.value = info
+            }
+        }
+    }
+
+    fun checkForUpdatesNow() {
+        viewModelScope.launch {
+            _updateCheckInProgress.value = true
+            val info = UpdateChecker.check(getApplication(), force = true)
+            _updateCheckInProgress.value = false
+            _updateInfo.value = info
+        }
+    }
+
+    fun dismissUpdateDialog() { _updateInfo.value = null }
+
+    fun skipCurrentUpdate() {
+        _updateInfo.value?.let {
+            UpdateChecker.skipVersion(getApplication(), it.latestVersion)
+        }
+        _updateInfo.value = null
     }
 
     override fun onCleared() {

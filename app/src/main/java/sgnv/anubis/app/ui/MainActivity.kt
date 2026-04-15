@@ -16,6 +16,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -26,6 +27,7 @@ import sgnv.anubis.app.ui.screens.AppListScreen
 import sgnv.anubis.app.ui.screens.HomeScreen
 import sgnv.anubis.app.ui.screens.SettingsScreen
 import sgnv.anubis.app.ui.theme.AnubisTheme
+import sgnv.anubis.app.update.UpdateDialog
 
 class MainActivity : ComponentActivity() {
 
@@ -85,6 +87,17 @@ class MainActivity : ComponentActivity() {
                         )
                         1 -> AppListScreen(viewModel, Modifier.padding(padding))
                         2 -> SettingsScreen(viewModel, Modifier.padding(padding))
+                    }
+
+                    val updateInfo by viewModel.updateInfo.collectAsState()
+                    updateInfo?.let { info ->
+                        if (info.isUpdateAvailable) {
+                            UpdateDialog(
+                                info = info,
+                                onDismiss = { viewModel.dismissUpdateDialog() },
+                                onSkip = { viewModel.skipCurrentUpdate() },
+                            )
+                        }
                     }
                 }
             }

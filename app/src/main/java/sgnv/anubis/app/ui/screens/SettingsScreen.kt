@@ -226,7 +226,54 @@ fun SettingsScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(12.dp))
+
+                val updateCheckEnabled by viewModel.updateCheckEnabled.collectAsState()
+                val updateCheckInProgress by viewModel.updateCheckInProgress.collectAsState()
+                val updateInfo by viewModel.updateInfo.collectAsState()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Проверять обновления", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Автоматическая проверка при запуске",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = updateCheckEnabled,
+                        onCheckedChange = { viewModel.setUpdateCheckEnabled(it) }
+                    )
+                }
+
                 Spacer(Modifier.height(8.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = { viewModel.checkForUpdatesNow() },
+                        enabled = !updateCheckInProgress
+                    ) {
+                        Text(
+                            if (updateCheckInProgress) "Проверка..." else "Проверить сейчас",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                    updateInfo?.let { info ->
+                        if (!info.isUpdateAvailable) {
+                            Text(
+                                "У вас последняя версия",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
                 val context = LocalContext.current
                 TextButton(onClick = {
                     val intent = android.content.Intent(
