@@ -22,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -42,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sgnv.anubis.app.data.DefaultRestrictedApps
 import sgnv.anubis.app.data.model.AppGroup
@@ -59,10 +61,17 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     var pendingFirstAdd by remember { mutableStateOf<String?>(null) }
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var searchQuery by rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
 
     val userApps = allApps.filter { !it.isSystem }
     val systemApps = allApps.filter { it.isSystem }
     val currentList = if (selectedTab == 0) userApps else systemApps
+    val normalizedQuery = searchQuery.trim()
+    val filteredList = currentList.filter { app ->
+        normalizedQuery.isBlank() ||
+            app.label.contains(normalizedQuery, ignoreCase = true) ||
+            app.packageName.contains(normalizedQuery, ignoreCase = true)
+    }
 
     val noVpnCount = allApps.count { it.group == AppGroup.LOCAL }
     val vpnOnlyCount = allApps.count { it.group == AppGroup.VPN_ONLY }
@@ -73,6 +82,17 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             .fillMaxSize()
             .padding(horizontal = 16.dp)
     ) {
+        Spacer(Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Поиск по приложениям") },
+            placeholder = { Text("Название или package name") }
+        )
+
         Spacer(Modifier.height(8.dp))
 
         Text(
@@ -138,7 +158,19 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             item { Spacer(Modifier.height(8.dp)) }
-            items(currentList, key = { it.packageName }) { app ->
+            if (filteredList.isEmpty()) {
+                item {
+                    Text(
+                        if (normalizedQuery.isBlank()) "Список пуст." else "Ничего не найдено по запросу \"$normalizedQuery\".",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp)
+                    )
+                }
+            }
+            items(filteredList, key = { it.packageName }) { app ->
                 AppRow(
                     app = app,
                     isKnownRestricted = DefaultRestrictedApps.isKnownRestricted(app.packageName),
@@ -291,7 +323,9 @@ private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGro
                 Text(
                     app.packageName,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 

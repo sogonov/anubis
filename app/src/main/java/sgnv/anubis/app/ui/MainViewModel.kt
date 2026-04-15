@@ -165,6 +165,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun freezeLocalApps() {
+        viewModelScope.launch {
+            orchestrator.freezeOnly()
+        }
+    }
+
     fun launchWithVpn(packageName: String) {
         viewModelScope.launch {
             orchestrator.launchWithVpn(packageName, _selectedVpnClient.value)
