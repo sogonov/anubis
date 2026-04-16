@@ -9,7 +9,8 @@ enum class VpnClientType(
     V2RAY_NG("Play", "com.v2ray.ang", brand = "v2rayNG"),
     V2RAY_NG_FDROID("F-Droid", "com.v2ray.ang.fdroid", brand = "v2rayNG"),
     NEKO_BOX("NekoBox", "moe.nb4a"),
-    HAPP("Happ", "com.happproxy"),
+    HAPP("Play", "com.happproxy", brand = "Happ"),
+    HAPP_GITHUB("Github", "su.happ.proxyutility", brand = "Happ"),
     V2RAY_TUN("v2rayTun", "com.v2raytun.android"),
     V2BOX("V2Box", "dev.hexasoftware.v2box");
 
@@ -108,7 +109,7 @@ object VpnClientControls {
             ),
         ),
 
-        // Happ: widget broadcast toggle (discovered via jadx analysis)
+        // Happ (Play): widget broadcast toggle (discovered via jadx analysis)
         VpnClientType.HAPP to VpnClientControl(
             clientType = VpnClientType.HAPP,
             mode = VpnControlMode.TOGGLE,
@@ -116,6 +117,19 @@ object VpnClientControls {
                 "am", "broadcast",
                 "-a", "com.happproxy.action.widget.click",
                 "-n", "com.happproxy/.receiver.WidgetProvider"
+            ),
+        ),
+
+        // Happ (GitHub): su.happ.proxyutility fork — both applicationId AND
+        // the Java package of the receiver changed, so action mirrors the new id
+        // and the component uses the relative form.
+        VpnClientType.HAPP_GITHUB to VpnClientControl(
+            clientType = VpnClientType.HAPP_GITHUB,
+            mode = VpnControlMode.TOGGLE,
+            startCommand = arrayOf(
+                "am", "broadcast",
+                "-a", "su.happ.proxyutility.action.widget.click",
+                "-n", "su.happ.proxyutility/.receiver.WidgetProvider"
             ),
         ),
 
