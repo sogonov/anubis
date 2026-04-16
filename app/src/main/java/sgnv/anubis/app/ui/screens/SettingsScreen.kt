@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +24,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -329,15 +332,47 @@ fun SettingsScreen(
                 .sortedBy { it.label.lowercase() }
         }
 
+        var pickerQuery by rememberSaveable { mutableStateOf("") }
+        val normalizedPickerQuery = pickerQuery.trim()
+        val filteredCandidates = vpnCandidates.filter { app ->
+            normalizedPickerQuery.isBlank() ||
+                app.label.contains(normalizedPickerQuery, ignoreCase = true) ||
+                app.packageName.contains(normalizedPickerQuery, ignoreCase = true)
+        }
+
         ModalBottomSheet(
             onDismissRequest = { showAppPicker = false },
-            sheetState = rememberModalBottomSheetState()
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
-            Column(Modifier.padding(horizontal = 16.dp)) {
+            Column(
+                Modifier
+                    .padding(horizontal = 16.dp)
+                    .imePadding()
+            ) {
                 Text("Выберите VPN-клиент", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = pickerQuery,
+                    onValueChange = { pickerQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Поиск по названию или package") }
+                )
+                Spacer(Modifier.height(8.dp))
                 LazyColumn(modifier = Modifier.height(400.dp)) {
-                    items(vpnCandidates, key = { it.packageName }) { app ->
+                    if (filteredCandidates.isEmpty()) {
+                        item {
+                            Text(
+                                "Ничего не найдено по запросу \"$normalizedPickerQuery\".",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp)
+                            )
+                        }
+                    }
+                    items(filteredCandidates, key = { it.packageName }) { app ->
                         val iconBitmap = remember(app.packageName) {
                             try {
                                 val drawable = pm.getApplicationIcon(app.packageName)
