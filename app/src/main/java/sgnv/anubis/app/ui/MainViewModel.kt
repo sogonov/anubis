@@ -1,7 +1,6 @@
 package sgnv.anubis.app.ui
 
 import android.app.Application
-import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,6 +14,7 @@ import sgnv.anubis.app.service.StealthOrchestrator
 import sgnv.anubis.app.service.StealthState
 import sgnv.anubis.app.service.StealthVpnService
 import sgnv.anubis.app.service.VpnMonitorService
+import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.update.UpdateChecker
 import sgnv.anubis.app.update.UpdateInfo
@@ -85,6 +85,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _backgroundMonitoring = MutableStateFlow(false)
     val backgroundMonitoring: StateFlow<Boolean> = _backgroundMonitoring
 
+    // Exposes issue #31 behavior to Compose settings UI.
+    private val _unfreezeManagedAppsOnVpnToggle = MutableStateFlow(false)
+    val unfreezeManagedAppsOnVpnToggle: StateFlow<Boolean> = _unfreezeManagedAppsOnVpnToggle
+
     private val _dangerousAppWarning = MutableStateFlow<String?>(null)
     val dangerousAppWarning: StateFlow<String?> = _dangerousAppWarning
 
@@ -109,6 +113,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scheduleAutoFreeze()
         observeVpnState()
         loadBackgroundMonitoring()
+        loadUnfreezeManagedAppsOnVpnToggle()
         checkDangerousApps()
         loadUpdateCheckPref()
         autoCheckForUpdates()
@@ -326,10 +331,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectVpnClient(client: SelectedVpnClient) {
         _selectedVpnClient.value = client
-        getApplication<Application>()
-            .getSharedPreferences("settings", Context.MODE_PRIVATE)
+        AppSettings.prefs(getApplication())
             .edit()
-            .putString("vpn_client_package", client.packageName)
+            .putString(AppSettings.KEY_VPN_CLIENT_PACKAGE, client.packageName)
             .apply()
     }
 
@@ -342,8 +346,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setBackgroundMonitoring(enabled: Boolean) {
         _backgroundMonitoring.value = enabled
         val app = getApplication<Application>()
-        app.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .edit().putBoolean("background_monitoring", enabled).apply()
+        AppSettings.prefs(app)
+            .edit()
+            .putBoolean(AppSettings.KEY_BACKGROUND_MONITORING, enabled)
+            .apply()
         if (enabled) {
             VpnMonitorService.start(app)
         } else {
@@ -352,13 +358,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadBackgroundMonitoring() {
-        val prefs = getApplication<Application>()
-            .getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val enabled = prefs.getBoolean("background_monitoring", false)
+        val enabled = AppSettings.prefs(getApplication())
+            .getBoolean(AppSettings.KEY_BACKGROUND_MONITORING, false)
         _backgroundMonitoring.value = enabled
         if (enabled) {
             VpnMonitorService.start(getApplication())
         }
+    }
+
+    fun setUnfreezeManagedAppsOnVpnToggle(enabled: Boolean) {
+        _unfreezeManagedAppsOnVpnToggle.value = enabled
+        // Persist immediately so orchestrators and services pick the flag up without restart.
+        AppSettings.prefs(getApplication())
+            .edit()
+            .putBoolean(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE, enabled)
+            .apply()
+    }
+
+    private fun loadUnfreezeManagedAppsOnVpnToggle() {
+        // Load once on startup; services read the same flag directly from shared prefs.
+        _unfreezeManagedAppsOnVpnToggle.value = AppSettings.prefs(getApplication())
+            .getBoolean(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE, false)
     }
 
     fun dismissDangerousAppWarning() {
@@ -469,9 +489,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadSelectedClient() {
-        val prefs = getApplication<Application>()
-            .getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val pkg = prefs.getString("vpn_client_package", null)
+        val prefs = AppSettings.prefs(getApplication())
+        val pkg = prefs.getString(AppSettings.KEY_VPN_CLIENT_PACKAGE, null)
             ?: prefs.getString("vpn_client", null)?.let {
                 // Migration from old format (enum name → package name)
                 try { VpnClientType.valueOf(it).packageName } catch (e: Exception) { null }

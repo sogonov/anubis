@@ -20,6 +20,7 @@ import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.R
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
+import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.ui.MainActivity
 
 /**
@@ -65,7 +66,7 @@ class VpnMonitorService : Service() {
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 // VPN turned ON — freeze LOCAL group
-                scope.launch { freezeGroup(AppGroup.LOCAL) }
+                scope.launch { applyManagedStateForVpn(active = true) }
             }
 
             override fun onLost(network: Network) {
@@ -75,7 +76,7 @@ class VpnMonitorService : Service() {
                         ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
                 }
                 if (!stillActive) {
-                    scope.launch { freezeGroup(AppGroup.VPN_ONLY) }
+                    scope.launch { applyManagedStateForVpn(active = false) }
                 }
             }
         }
@@ -107,6 +108,38 @@ class VpnMonitorService : Service() {
         for (pkg in packages) {
             if (shizukuManager.isAppInstalled(pkg) && !shizukuManager.isAppFrozen(pkg)) {
                 shizukuManager.freezeApp(pkg)
+            }
+        }
+    }
+
+    private suspend fun unfreezeGroup(group: AppGroup) {
+        val app = applicationContext as AnubisApp
+        val shizukuManager = app.shizukuManager
+        if (!shizukuManager.isAvailable() || !shizukuManager.hasPermission()) return
+        shizukuManager.bindUserService()
+        kotlinx.coroutines.delay(200)
+
+        val repo = AppRepository(app.database.managedAppDao(), applicationContext)
+        val packages = repo.getPackagesByGroup(group)
+        for (pkg in packages) {
+            if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
+                shizukuManager.unfreezeApp(pkg)
+            }
+        }
+    }
+
+    private suspend fun applyManagedStateForVpn(active: Boolean) {
+        if (active) {
+            freezeGroup(AppGroup.LOCAL)
+            // Mirror manual orchestration when VPN is toggled outside Anubis.
+            if (AppSettings.shouldUnfreezeManagedAppsOnVpnToggle(applicationContext)) {
+                unfreezeGroup(AppGroup.VPN_ONLY)
+            }
+        } else {
+            freezeGroup(AppGroup.VPN_ONLY)
+            // Mirror manual orchestration when VPN is toggled outside Anubis.
+            if (AppSettings.shouldUnfreezeManagedAppsOnVpnToggle(applicationContext)) {
+                unfreezeGroup(AppGroup.LOCAL)
             }
         }
     }
