@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,18 +18,28 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,11 +49,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sgnv.anubis.app.data.DefaultRestrictedApps
@@ -51,6 +65,12 @@ import sgnv.anubis.app.data.model.InstalledAppInfo
 import sgnv.anubis.app.ui.MainViewModel
 
 private val grayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+
+private enum class SortBy(val label: String) {
+    GROUP("По группе"),
+    NAME("По названию"),
+    PACKAGE("По package")
+}
 
 @Composable
 fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
@@ -61,7 +81,13 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     var pendingFirstAdd by remember { mutableStateOf<String?>(null) }
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var searchQuery by rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var sortOrdinal by rememberSaveable { mutableIntStateOf(SortBy.GROUP.ordinal) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
+    val sortBy = SortBy.entries[sortOrdinal]
+
+    val focusRequester = remember { FocusRequester() }
 
     val userApps = allApps.filter { !it.isSystem }
     val systemApps = allApps.filter { it.isSystem }
@@ -71,6 +97,13 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
         normalizedQuery.isBlank() ||
             app.label.contains(normalizedQuery, ignoreCase = true) ||
             app.packageName.contains(normalizedQuery, ignoreCase = true)
+    }
+    val sortedList = when (sortBy) {
+        SortBy.NAME -> filteredList.sortedBy { it.label.lowercase() }
+        SortBy.PACKAGE -> filteredList.sortedBy { it.packageName }
+        SortBy.GROUP -> filteredList.sortedWith(
+            compareBy({ it.group?.ordinal ?: Int.MAX_VALUE }, { it.label.lowercase() })
+        )
     }
 
     val noVpnCount = allApps.count { it.group == AppGroup.LOCAL }
@@ -84,22 +117,69 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     ) {
         Spacer(Modifier.height(8.dp))
 
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Поиск по приложениям") },
-            placeholder = { Text("Название или package name") }
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            "Без VPN: $noVpnCount | Только VPN: $vpnOnlyCount | С VPN: $launchCount",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium
-        )
+        if (searchActive) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+                singleLine = true,
+                placeholder = { Text("Название или package") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                leadingIcon = {
+                    IconButton(onClick = {
+                        searchActive = false
+                        searchQuery = ""
+                    }) {
+                        Icon(Icons.Default.Close, contentDescription = "Закрыть поиск")
+                    }
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Очистить")
+                        }
+                    }
+                }
+            )
+            LaunchedEffect(Unit) { focusRequester.requestFocus() }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Без VPN: $noVpnCount | Только VPN: $vpnOnlyCount | С VPN: $launchCount",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { searchActive = true }) {
+                    Icon(Icons.Default.Search, contentDescription = "Поиск")
+                }
+                Box {
+                    TextButton(onClick = { sortMenuOpen = true }) {
+                        Text(sortBy.label, style = MaterialTheme.typography.labelMedium)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                    }
+                    DropdownMenu(
+                        expanded = sortMenuOpen,
+                        onDismissRequest = { sortMenuOpen = false }
+                    ) {
+                        SortBy.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.label) },
+                                onClick = {
+                                    sortOrdinal = option.ordinal
+                                    sortMenuOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -158,7 +238,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             item { Spacer(Modifier.height(8.dp)) }
-            if (filteredList.isEmpty()) {
+            if (sortedList.isEmpty()) {
                 item {
                     Text(
                         if (normalizedQuery.isBlank()) "Список пуст." else "Ничего не найдено по запросу \"$normalizedQuery\".",
@@ -170,7 +250,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            items(filteredList, key = { it.packageName }) { app ->
+            items(sortedList, key = { it.packageName }) { app ->
                 AppRow(
                     app = app,
                     isKnownRestricted = DefaultRestrictedApps.isKnownRestricted(app.packageName),
