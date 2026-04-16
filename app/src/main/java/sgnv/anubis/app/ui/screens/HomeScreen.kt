@@ -32,7 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -158,19 +157,6 @@ fun HomeScreen(
                         },
                         enabled = !isTransitioning && shizukuStatus == ShizukuStatus.READY
                     )
-                }
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                OutlinedButton(
-                    onClick = { viewModel.freezeLocalApps() },
-                    enabled = !isTransitioning && shizukuStatus == ShizukuStatus.READY
-                ) {
-                    Text("Заморозить «Без VPN»")
                 }
             }
         }

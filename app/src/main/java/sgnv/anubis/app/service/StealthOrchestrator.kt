@@ -43,6 +43,8 @@ class StealthOrchestrator(
      */
     fun syncState() {
         val vpnActive = vpnClientManager.vpnActive.value
+        // If VPN is on, we're in stealth mode (spies should be frozen)
+        // If VPN is off, stealth is disabled
         val newState = if (vpnActive) StealthState.ENABLED else StealthState.DISABLED
         if (_state.value != StealthState.ENABLING && _state.value != StealthState.DISABLING) {
             _state.value = newState
@@ -60,6 +62,7 @@ class StealthOrchestrator(
     suspend fun enable(client: SelectedVpnClient) {
         _lastError.value = null
         _state.value = StealthState.ENABLING
+
         if (!checkShizuku()) return
 
         if (shizukuManager.isAppFrozen(client.packageName)) {
@@ -87,6 +90,7 @@ class StealthOrchestrator(
     suspend fun disable(client: SelectedVpnClient, detectedPackage: String?) {
         _lastError.value = null
         _state.value = StealthState.DISABLING
+
         if (vpnClientManager.vpnActive.value) {
             if (!stopVpn(client, detectedPackage)) {
                 _lastError.value = "Не удалось отключить VPN. Приложения НЕ разморожены."
@@ -108,7 +112,7 @@ class StealthOrchestrator(
         if (!checkShizuku()) return
         freezeGroup(AppGroup.LOCAL)
         bumpVersion()
-        syncState()
+        _state.value = StealthState.ENABLED
     }
 
     /**
@@ -118,7 +122,7 @@ class StealthOrchestrator(
         if (!checkShizuku()) return
         freezeGroup(AppGroup.VPN_ONLY)
         bumpVersion()
-        syncState()
+        _state.value = StealthState.DISABLED
     }
 
     /**
