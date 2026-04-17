@@ -302,6 +302,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Directly assign an app to a specific group (used by the Home-screen inline add picker). */
+    fun setAppGroup(packageName: String, group: AppGroup) {
+        viewModelScope.launch {
+            repository.setAppGroup(packageName, group)
+            loadInstalledApps()
+            loadGroupedApps()
+        }
+    }
+
     fun autoSelectRestricted() {
         viewModelScope.launch {
             repository.autoSelectRestricted()

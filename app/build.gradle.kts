@@ -15,8 +15,8 @@ android {
         applicationId = "sgnv.anubis.app"
         minSdk = 29
         targetSdk = 34
-        versionCode = 5
-        versionName = "0.1.4-beta.1"
+        versionCode = 6
+        versionName = "0.1.4"
     }
 
     signingConfigs {

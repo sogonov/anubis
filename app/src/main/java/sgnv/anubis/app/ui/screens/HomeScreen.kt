@@ -24,12 +24,16 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
@@ -102,6 +106,8 @@ fun HomeScreen(
 
     // Context menu state
     var menuApp by remember { mutableStateOf<String?>(null) }
+    // Inline "add to group" sheet: non-null means that group's sheet is open.
+    var addingToGroup by remember { mutableStateOf<sgnv.anubis.app.data.model.AppGroup?>(null) }
 
     Column(
         modifier = modifier
@@ -207,7 +213,8 @@ fun HomeScreen(
                 viewModel = viewModel,
                 frozenVersion = frozenVersion,
                 onClick = { pkg -> viewModel.launchLocal(pkg) },
-                onLongClick = { pkg -> menuApp = pkg }
+                onLongClick = { pkg -> menuApp = pkg },
+                onAdd = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LOCAL_AUTO_UNFREEZE }
             )
         }
 
@@ -221,7 +228,8 @@ fun HomeScreen(
                 viewModel = viewModel,
                 frozenVersion = frozenVersion,
                 onClick = { pkg -> viewModel.launchLocal(pkg) },
-                onLongClick = { pkg -> menuApp = pkg }
+                onLongClick = { pkg -> menuApp = pkg },
+                onAdd = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LOCAL }
             )
         }
 
@@ -235,7 +243,8 @@ fun HomeScreen(
                 viewModel = viewModel,
                 frozenVersion = frozenVersion,
                 onClick = { pkg -> viewModel.launchWithVpn(pkg) },
-                onLongClick = { pkg -> menuApp = pkg }
+                onLongClick = { pkg -> menuApp = pkg },
+                onAdd = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LAUNCH_VPN }
             )
         }
 
@@ -249,19 +258,43 @@ fun HomeScreen(
                 viewModel = viewModel,
                 frozenVersion = frozenVersion,
                 onClick = { pkg -> viewModel.launchWithVpn(pkg) },
-                onLongClick = { pkg -> menuApp = pkg }
+                onLongClick = { pkg -> menuApp = pkg },
+                onAdd = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.VPN_ONLY }
             )
         }
 
         if (localApps.isEmpty() && localAutoUnfreezeApps.isEmpty() && vpnOnlyApps.isEmpty() && launchVpnApps.isEmpty()) {
             Spacer(Modifier.height(24.dp))
             Text(
-                "Нет приложений в группах. Добавьте во вкладке «Приложения».",
+                "Нет приложений в группах. Добавьте хотя бы в одну:",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                EmptyGroupAddButton(
+                    label = "Без VPN + уведомления",
+                    tint = MaterialTheme.colorScheme.secondary,
+                    onClick = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LOCAL_AUTO_UNFREEZE }
+                )
+                EmptyGroupAddButton(
+                    label = "Без VPN",
+                    tint = MaterialTheme.colorScheme.error,
+                    onClick = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LOCAL }
+                )
+                EmptyGroupAddButton(
+                    label = "Запуск с VPN",
+                    tint = MaterialTheme.colorScheme.primary,
+                    onClick = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LAUNCH_VPN }
+                )
+                EmptyGroupAddButton(
+                    label = "Только VPN",
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    onClick = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.VPN_ONLY }
+                )
+            }
         }
 
         // Network
@@ -333,6 +366,15 @@ fun HomeScreen(
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissDangerousAppWarning() }) { Text("Закрыть") }
             }
+        )
+    }
+
+    // Inline add-to-group sheet (one per tap on the "+" in a group header)
+    addingToGroup?.let { group ->
+        AddAppSheet(
+            viewModel = viewModel,
+            targetGroup = group,
+            onDismiss = { addingToGroup = null }
         )
     }
 
@@ -427,10 +469,31 @@ private fun AppGroupSection(
     viewModel: MainViewModel,
     frozenVersion: Long,
     onClick: (String) -> Unit,
-    onLongClick: (String) -> Unit
+    onLongClick: (String) -> Unit,
+    onAdd: () -> Unit,
 ) {
-    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = tintColor)
-    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = tintColor
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        IconButton(onClick = onAdd) {
+            Icon(
+                Icons.Default.Add,
+                contentDescription = "Добавить приложение",
+                tint = tintColor
+            )
+        }
+    }
     Spacer(Modifier.height(8.dp))
 
     val pm = LocalContext.current.packageManager
@@ -588,5 +651,30 @@ private fun InfoRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun EmptyGroupAddButton(
+    label: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = tint)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "Добавить в «$label»",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = tint
+            )
+        }
     }
 }
