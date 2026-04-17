@@ -1,6 +1,5 @@
 package sgnv.anubis.app.service
 
-import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.service.quicksettings.Tile
@@ -8,13 +7,14 @@ import android.service.quicksettings.TileService
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.data.repository.AppRepository
 import sgnv.anubis.app.settings.AppSettings
-import sgnv.anubis.app.vpn.VpnClientManager
 import sgnv.anubis.app.vpn.SelectedVpnClient
+import sgnv.anubis.app.vpn.VpnClientManager
 import sgnv.anubis.app.vpn.VpnClientType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class StealthTileService : TileService() {
@@ -28,6 +28,9 @@ class StealthTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
+
+        val willBeActive = !isVpnActive()
+        updateTile(isActive = willBeActive)
 
         val app = application as AnubisApp
         val shizukuManager = app.shizukuManager
@@ -47,11 +50,9 @@ class StealthTileService : TileService() {
 
         scope.launch {
             // Small delay for UserService connection callback
-            kotlinx.coroutines.delay(200)
+            delay(200)
 
-            val vpnActive = isVpnActive()
-
-            if (!vpnActive) {
+            if (willBeActive) {
                 orchestrator.enable(client)
                 VpnMonitorService.start(this@StealthTileService)
             } else {
@@ -59,32 +60,34 @@ class StealthTileService : TileService() {
                 vpnClientManager.detectActiveVpnClient()
                 val detectedPkg = vpnClientManager.activeVpnPackage.value
                 orchestrator.disable(client, detectedPkg)
-                if (!isVpnActive()) {
-                    VpnMonitorService.stop(this@StealthTileService)
-                }
+                VpnMonitorService.stop(this@StealthTileService)
             }
+
+            delay(2000)
 
             vpnClientManager.stopMonitoringVpn()
             updateTile()
         }
     }
 
-    private fun updateTile() {
+    private fun updateTile(isActive: Boolean? = null) {
         val tile = qsTile ?: return
-        val vpnActive = isVpnActive()
+        val vpnActive = isActive ?: isVpnActive()
         tile.state = if (vpnActive) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = if (vpnActive) "Stealth ON" else "Stealth OFF"
         tile.updateTile()
     }
 
     private fun isVpnActive(): Boolean {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         return try {
             cm.allNetworks.any { network ->
                 cm.getNetworkCapabilities(network)
                     ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
             }
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     override fun onDestroy() {
