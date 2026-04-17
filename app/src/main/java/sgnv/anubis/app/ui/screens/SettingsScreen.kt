@@ -74,19 +74,34 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // Optional issue #31 setting: switch between strict freeze-only mode and auto-unfreeze mode.
-        Card(modifier = Modifier.fillMaxWidth()) {
+        // Issue #31 setting — deprecated: the per-group LOCAL_AUTO_UNFREEZE replaces this
+        // global toggle. Kept for users who enabled it in v0.1.4-beta.1. Removed in v0.1.5.
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Размораживать группы при включении/отключении VPN", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "После включения VPN размораживает \"Только VPN\", после отключения — \"Без VPN\"",
+                        "Размораживать группы при включении/отключении VPN",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "После включения VPN размораживает «Только VPN», после отключения — «Без VPN».",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Устаревший переключатель. Будет удалён в v0.1.5. Вместо него используйте группу «Без VPN + уведомления» для нужных приложений.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
                 androidx.compose.material3.Switch(
