@@ -57,6 +57,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val shizukuStatus: StateFlow<ShizukuStatus> = shizukuManager.status
     val frozenVersion: StateFlow<Long> = orchestrator.frozenVersion
 
+    /** Easter-egg: "Заморожено N за X с" / "Разморожено ..." — direct pass-through. */
+    val benchmark: SharedFlow<String> = orchestrator.benchmark
+
     fun getVpnPermissionIntent(): Intent? = StealthVpnService.prepareVpn(getApplication())
 
     private val _installedApps = MutableStateFlow<List<InstalledAppInfo>>(emptyList())

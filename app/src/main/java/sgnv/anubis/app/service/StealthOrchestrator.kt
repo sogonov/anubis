@@ -12,10 +12,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Core logic:
@@ -61,6 +64,10 @@ class StealthOrchestrator(
     private val _frozenVersion = MutableStateFlow(0L)
     val frozenVersion: StateFlow<Long> = _frozenVersion
 
+    /** Easter-egg benchmark: emits "Заморожено N за X.Xс" / "Разморожено ..." after group ops. */
+    private val _benchmark = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val benchmark: SharedFlow<String> = _benchmark
+
     /**
      * Enable stealth (VPN ON): freeze LOCAL apps, start VPN.
      * VPN_ONLY stays frozen — they are only unfrozen by explicit launch.
@@ -76,8 +83,9 @@ class StealthOrchestrator(
             return
         }
 
-        freezeGroup(AppGroup.LOCAL)
-        freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
+        val benchStart = System.currentTimeMillis()
+        val frozen = freezeGroup(AppGroup.LOCAL) + freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
+        emitBenchmark(frozen = frozen, unfrozen = 0, startMs = benchStart)
 
         vpnClientManager.startVPN(client)
 
@@ -218,58 +226,82 @@ class StealthOrchestrator(
         return true
     }
 
-    private suspend fun freezeGroup(group: AppGroup) {
+    /** Returns the number of apps actually transitioned (already-frozen apps are skipped). */
+    private suspend fun freezeGroup(group: AppGroup): Int {
         val packages = repository.getPackagesByGroup(group)
         val sem = Semaphore(FREEZE_CONCURRENCY)
+        val counter = AtomicInteger(0)
         coroutineScope {
             packages.map { pkg ->
                 async {
                     sem.withPermit {
                         if (shizukuManager.isAppInstalled(pkg) && !shizukuManager.isAppFrozen(pkg)) {
                             shizukuManager.freezeApp(pkg)
+                            counter.incrementAndGet()
                         }
                     }
                 }
             }.awaitAll()
         }
+        return counter.get()
     }
 
-    private suspend fun unfreezeGroup(group: AppGroup) {
+    private suspend fun unfreezeGroup(group: AppGroup): Int {
         val packages = repository.getPackagesByGroup(group)
         val sem = Semaphore(FREEZE_CONCURRENCY)
+        val counter = AtomicInteger(0)
         coroutineScope {
             packages.map { pkg ->
                 async {
                     sem.withPermit {
                         if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
                             shizukuManager.unfreezeApp(pkg)
+                            counter.incrementAndGet()
                         }
                     }
                 }
             }.awaitAll()
         }
+        return counter.get()
+    }
+
+    private fun emitBenchmark(frozen: Int, unfrozen: Int, startMs: Long) {
+        if (frozen == 0 && unfrozen == 0) return
+        val secs = (System.currentTimeMillis() - startMs) / 1000.0
+        val formattedSecs = "%.1f".format(secs)
+        val msg = when {
+            frozen > 0 && unfrozen > 0 ->
+                "Заморожено $frozen, разморожено $unfrozen за $formattedSecs с"
+            frozen > 0 -> "Заморожено $frozen за $formattedSecs с"
+            else -> "Разморожено $unfrozen за $formattedSecs с"
+        }
+        _benchmark.tryEmit(msg)
     }
 
     private suspend fun applyManagedStateForVpn(active: Boolean) {
+        val benchStart = System.currentTimeMillis()
+        var frozen = 0
+        var unfrozen = 0
         if (active) {
-            freezeGroup(AppGroup.LOCAL)
+            frozen += freezeGroup(AppGroup.LOCAL)
             // LOCAL_AUTO_UNFREEZE: freeze unconditionally when VPN comes up — that's the whole point of the group.
-            freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
+            frozen += freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
             // Optional issue #31 behavior: make VPN_ONLY apps usable immediately after VPN comes up.
             if (shouldUnfreezeManagedAppsOnVpnToggle()) {
-                unfreezeGroup(AppGroup.VPN_ONLY)
+                unfrozen += unfreezeGroup(AppGroup.VPN_ONLY)
             }
             _state.value = StealthState.ENABLED
         } else {
-            freezeGroup(AppGroup.VPN_ONLY)
+            frozen += freezeGroup(AppGroup.VPN_ONLY)
             // LOCAL_AUTO_UNFREEZE: unfreeze unconditionally when VPN goes down — that's the whole point of the group.
-            unfreezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
+            unfrozen += unfreezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
             // Optional issue #31 behavior: restore LOCAL apps once VPN is fully down.
             if (shouldUnfreezeManagedAppsOnVpnToggle()) {
-                unfreezeGroup(AppGroup.LOCAL)
+                unfrozen += unfreezeGroup(AppGroup.LOCAL)
             }
             _state.value = StealthState.DISABLED
         }
+        emitBenchmark(frozen = frozen, unfrozen = unfrozen, startMs = benchStart)
         bumpVersion()
     }
 

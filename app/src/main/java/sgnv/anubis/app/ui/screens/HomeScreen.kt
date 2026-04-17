@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -109,6 +110,20 @@ fun HomeScreen(
     // Inline "add to group" sheet: non-null means that group's sheet is open.
     var addingToGroup by remember { mutableStateOf<sgnv.anubis.app.data.model.AppGroup?>(null) }
 
+    // Ephemeral benchmark message. Conflate-style: each new emit overwrites the previous
+    // and resets the 3s hide timer. Avoids flicker if multiple emits arrive in a burst
+    // (e.g. a hypothetical duplicate orchestration path).
+    var benchmarkMsg by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        viewModel.benchmark.collect { msg -> benchmarkMsg = msg }
+    }
+    LaunchedEffect(benchmarkMsg) {
+        if (benchmarkMsg != null) {
+            kotlinx.coroutines.delay(3000)
+            benchmarkMsg = null
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -165,6 +180,25 @@ fun HomeScreen(
                         enabled = !isTransitioning && shizukuStatus == ShizukuStatus.READY
                     )
                 }
+            }
+        }
+
+        // Benchmark easter-egg (auto-hides after 3s)
+        benchmarkMsg?.let { msg ->
+            Spacer(Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Text(
+                    msg,
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    textAlign = TextAlign.Center
+                )
             }
         }
 
