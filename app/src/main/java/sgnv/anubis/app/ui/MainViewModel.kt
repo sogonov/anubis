@@ -28,6 +28,7 @@ import android.content.pm.ShortcutManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Icon
+import android.graphics.drawable.AdaptiveIconDrawable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 import org.json.JSONObject
 import java.net.URL
 
@@ -210,6 +212,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun buildShortcutIcon(
+        pm: PackageManager,
+        sm: ShortcutManager,
+        packageName: String
+    ): Icon {
+        val drawable = pm.getApplicationIcon(packageName)
+        val visibleSize = maxOf(sm.iconMaxWidth, sm.iconMaxHeight).coerceAtLeast(1)
+
+        return if (drawable is AdaptiveIconDrawable) {
+            val extraInset = AdaptiveIconDrawable.getExtraInsetFraction()
+            val fullSize = (visibleSize * (1f + 2f * extraInset))
+                .roundToInt()
+                .coerceAtLeast(1)
+
+            val bmp = Bitmap.createBitmap(
+                fullSize,
+                fullSize,
+                Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bmp)
+            drawable.background?.let { bg ->
+                bg.setBounds(0, 0, fullSize, fullSize)
+                bg.draw(canvas)
+            }
+            drawable.foreground?.let { fg ->
+                fg.setBounds(0, 0, fullSize, fullSize)
+                fg.draw(canvas)
+            }
+            Icon.createWithAdaptiveBitmap(bmp)
+        } else {
+            val bmp = Bitmap.createBitmap(
+                visibleSize,
+                visibleSize,
+                Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bmp)
+            drawable.setBounds(0, 0, visibleSize, visibleSize)
+            drawable.draw(canvas)
+            Icon.createWithBitmap(bmp)
+        }
+    }
+
     fun createShortcut(packageName: String) {
         viewModelScope.launch {
             val app = getApplication<Application>()
@@ -224,16 +266,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) { packageName }
 
             val icon = try {
-                val drawable = pm.getApplicationIcon(packageName)
-                val bmp = Bitmap.createBitmap(
-                    drawable.intrinsicWidth.coerceAtLeast(1),
-                    drawable.intrinsicHeight.coerceAtLeast(1),
-                    Bitmap.Config.ARGB_8888
-                )
-                val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, canvas.width, canvas.height)
-                drawable.draw(canvas)
-                Icon.createWithBitmap(bmp)
+                buildShortcutIcon(pm, sm, packageName)
             } catch (e: Exception) {
                 Icon.createWithResource(app, android.R.drawable.sym_def_app_icon)
             }
