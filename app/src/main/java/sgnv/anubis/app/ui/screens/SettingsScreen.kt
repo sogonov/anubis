@@ -59,6 +59,7 @@ fun SettingsScreen(
     val selectedClient by viewModel.selectedVpnClient.collectAsState()
     val installedClients by viewModel.installedVpnClients.collectAsState()
     val shizukuStatus by viewModel.shizukuStatus.collectAsState()
+    val unfreezeManagedAppsOnVpnToggle by viewModel.unfreezeManagedAppsOnVpnToggle.collectAsState()
     var showAppPicker by remember { mutableStateOf(false) }
 
     Column(
@@ -185,6 +186,30 @@ fun SettingsScreen(
                 androidx.compose.material3.Switch(
                     checked = bgMonitoring,
                     onCheckedChange = { viewModel.setBackgroundMonitoring(it) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Optional issue #31 setting: switch between strict freeze-only mode and auto-unfreeze mode.
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Размораживать группы при включении/отключении VPN", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "После включения VPN размораживает \"Только VPN\", после отключения — \"Без VPN\"",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                androidx.compose.material3.Switch(
+                    checked = unfreezeManagedAppsOnVpnToggle,
+                    onCheckedChange = { viewModel.setUnfreezeManagedAppsOnVpnToggle(it) }
                 )
             }
         }

@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
+import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.vpn.VpnClientManager
 import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientType
@@ -33,8 +34,10 @@ class ShortcutActivity : ComponentActivity() {
         val repository = AppRepository(app.database.managedAppDao(), this)
         val orchestrator = StealthOrchestrator(this, shizukuManager, vpnClientManager, repository)
 
-        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val pkg = prefs.getString("vpn_client_package", null) ?: VpnClientType.V2RAY_NG.packageName
+        // Shortcut launches must use the same selected VPN client as the main app UI.
+        val prefs = AppSettings.prefs(this)
+        val pkg = prefs.getString(AppSettings.KEY_VPN_CLIENT_PACKAGE, null)
+            ?: VpnClientType.V2RAY_NG.packageName
         val client = SelectedVpnClient.fromPackage(pkg)
 
         // Ensure UserService is bound (instant if already connected)

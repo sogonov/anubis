@@ -6,6 +6,7 @@ import android.content.Intent
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
+import sgnv.anubis.app.settings.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -15,8 +16,9 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
 
-        val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("freeze_on_boot", false)) return
+        // Reuse the shared settings accessor so boot flow reads the same keys as UI.
+        val prefs = AppSettings.prefs(context)
+        if (!prefs.getBoolean(AppSettings.KEY_FREEZE_ON_BOOT, false)) return
 
         val app = context.applicationContext as AnubisApp
         val shizukuManager = app.shizukuManager

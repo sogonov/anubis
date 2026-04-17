@@ -3,6 +3,7 @@ package sgnv.anubis.app.service
 import android.content.Context
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
+import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.shizuku.ShizukuManager
 import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientManager
@@ -99,9 +100,8 @@ class StealthOrchestrator(
             }
         }
 
-        freezeGroup(AppGroup.VPN_ONLY)
-        bumpVersion()
-        _state.value = StealthState.DISABLED
+        // After confirmed VPN shutdown, align managed groups with the new network state.
+        applyManagedStateForVpn(active = false)
     }
 
     /**
@@ -110,9 +110,8 @@ class StealthOrchestrator(
     suspend fun freezeOnly() {
         _lastError.value = null
         if (!checkShizuku()) return
-        freezeGroup(AppGroup.LOCAL)
-        bumpVersion()
-        _state.value = StealthState.ENABLED
+        // Handle external/manual VPN activation using the same managed-group rules.
+        applyManagedStateForVpn(active = true)
     }
 
     /**
@@ -120,9 +119,8 @@ class StealthOrchestrator(
      */
     suspend fun freezeVpnOnly() {
         if (!checkShizuku()) return
-        freezeGroup(AppGroup.VPN_ONLY)
-        bumpVersion()
-        _state.value = StealthState.DISABLED
+        // Handle external/manual VPN shutdown using the same managed-group rules.
+        applyManagedStateForVpn(active = false)
     }
 
     /**
@@ -221,6 +219,38 @@ class StealthOrchestrator(
                 shizukuManager.freezeApp(pkg)
             }
         }
+    }
+
+    private suspend fun unfreezeGroup(group: AppGroup) {
+        val packages = repository.getPackagesByGroup(group)
+        for (pkg in packages) {
+            if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
+                shizukuManager.unfreezeApp(pkg)
+            }
+        }
+    }
+
+    private suspend fun applyManagedStateForVpn(active: Boolean) {
+        if (active) {
+            freezeGroup(AppGroup.LOCAL)
+            // Optional issue #31 behavior: make VPN_ONLY apps usable immediately after VPN comes up.
+            if (shouldUnfreezeManagedAppsOnVpnToggle()) {
+                unfreezeGroup(AppGroup.VPN_ONLY)
+            }
+            _state.value = StealthState.ENABLED
+        } else {
+            freezeGroup(AppGroup.VPN_ONLY)
+            // Optional issue #31 behavior: restore LOCAL apps once VPN is fully down.
+            if (shouldUnfreezeManagedAppsOnVpnToggle()) {
+                unfreezeGroup(AppGroup.LOCAL)
+            }
+            _state.value = StealthState.DISABLED
+        }
+        bumpVersion()
+    }
+
+    private fun shouldUnfreezeManagedAppsOnVpnToggle(): Boolean {
+        return AppSettings.shouldUnfreezeManagedAppsOnVpnToggle(context)
     }
 
     private suspend fun waitForVpnOff(timeoutMs: Long): Boolean {
