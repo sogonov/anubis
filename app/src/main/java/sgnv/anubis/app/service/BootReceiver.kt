@@ -46,6 +46,15 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }
             }
+
+            // LOCAL_AUTO_UNFREEZE: VPN is off at boot, so these must be unfrozen to receive
+            // notifications. If the previous session left them disabled, restore them now.
+            val autoUnfreezePackages = repo.getPackagesByGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
+            for (pkg in autoUnfreezePackages) {
+                if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
+                    shizukuManager.unfreezeApp(pkg)
+                }
+            }
         }
     }
 }

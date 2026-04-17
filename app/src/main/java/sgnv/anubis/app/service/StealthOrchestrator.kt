@@ -77,6 +77,7 @@ class StealthOrchestrator(
         }
 
         freezeGroup(AppGroup.LOCAL)
+        freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
 
         vpnClientManager.startVPN(client)
 
@@ -252,6 +253,8 @@ class StealthOrchestrator(
     private suspend fun applyManagedStateForVpn(active: Boolean) {
         if (active) {
             freezeGroup(AppGroup.LOCAL)
+            // LOCAL_AUTO_UNFREEZE: freeze unconditionally when VPN comes up — that's the whole point of the group.
+            freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
             // Optional issue #31 behavior: make VPN_ONLY apps usable immediately after VPN comes up.
             if (shouldUnfreezeManagedAppsOnVpnToggle()) {
                 unfreezeGroup(AppGroup.VPN_ONLY)
@@ -259,6 +262,8 @@ class StealthOrchestrator(
             _state.value = StealthState.ENABLED
         } else {
             freezeGroup(AppGroup.VPN_ONLY)
+            // LOCAL_AUTO_UNFREEZE: unfreeze unconditionally when VPN goes down — that's the whole point of the group.
+            unfreezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
             // Optional issue #31 behavior: restore LOCAL apps once VPN is fully down.
             if (shouldUnfreezeManagedAppsOnVpnToggle()) {
                 unfreezeGroup(AppGroup.LOCAL)

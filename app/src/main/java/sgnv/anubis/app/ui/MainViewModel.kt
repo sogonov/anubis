@@ -66,6 +66,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _localApps = MutableStateFlow<List<ManagedApp>>(emptyList())
     val localApps: StateFlow<List<ManagedApp>> = _localApps
 
+    private val _localAutoUnfreezeApps = MutableStateFlow<List<ManagedApp>>(emptyList())
+    val localAutoUnfreezeApps: StateFlow<List<ManagedApp>> = _localAutoUnfreezeApps
+
     private val _vpnOnlyApps = MutableStateFlow<List<ManagedApp>>(emptyList())
     val vpnOnlyApps: StateFlow<List<ManagedApp>> = _vpnOnlyApps
 
@@ -357,6 +360,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadGroupedApps() {
         viewModelScope.launch {
             _localApps.value = repository.getAppsByGroup(AppGroup.LOCAL)
+            _localAutoUnfreezeApps.value = repository.getAppsByGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
             _vpnOnlyApps.value = repository.getAppsByGroup(AppGroup.VPN_ONLY)
             _launchVpnApps.value = repository.getAppsByGroup(AppGroup.LAUNCH_VPN)
         }

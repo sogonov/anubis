@@ -78,6 +78,7 @@ fun HomeScreen(
     val networkLoading by viewModel.networkLoading.collectAsState()
 
     val localApps by viewModel.localApps.collectAsState()
+    val localAutoUnfreezeApps by viewModel.localAutoUnfreezeApps.collectAsState()
     val vpnOnlyApps by viewModel.vpnOnlyApps.collectAsState()
     val launchVpnApps by viewModel.launchVpnApps.collectAsState()
     val installedApps by viewModel.installedApps.collectAsState()
@@ -196,6 +197,20 @@ fun HomeScreen(
         }
 
         // App groups
+        if (localAutoUnfreezeApps.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            AppGroupSection(
+                title = "Без VPN + уведомления",
+                subtitle = "Заморожены при VPN, активны и шлют уведомления без VPN",
+                apps = localAutoUnfreezeApps,
+                tintColor = MaterialTheme.colorScheme.secondary,
+                viewModel = viewModel,
+                frozenVersion = frozenVersion,
+                onClick = { pkg -> viewModel.launchLocal(pkg) },
+                onLongClick = { pkg -> menuApp = pkg }
+            )
+        }
+
         if (localApps.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             AppGroupSection(
@@ -238,7 +253,7 @@ fun HomeScreen(
             )
         }
 
-        if (localApps.isEmpty() && vpnOnlyApps.isEmpty() && launchVpnApps.isEmpty()) {
+        if (localApps.isEmpty() && localAutoUnfreezeApps.isEmpty() && vpnOnlyApps.isEmpty() && launchVpnApps.isEmpty()) {
             Spacer(Modifier.height(24.dp))
             Text(
                 "Нет приложений в группах. Добавьте во вкладке «Приложения».",

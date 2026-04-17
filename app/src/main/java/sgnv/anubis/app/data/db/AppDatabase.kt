@@ -14,7 +14,14 @@ class AppGroupConverter {
     fun fromAppGroup(group: AppGroup): String = group.name
 
     @TypeConverter
-    fun toAppGroup(name: String): AppGroup = AppGroup.valueOf(name)
+    fun toAppGroup(name: String): AppGroup = try {
+        AppGroup.valueOf(name)
+    } catch (e: IllegalArgumentException) {
+        // Defensive fallback for downgrade / forward-compat: an older build reading
+        // a row with a newer enum value shouldn't crash. Treat unknown as LOCAL
+        // (most-restrictive), user can re-classify from the UI.
+        AppGroup.LOCAL
+    }
 }
 
 @Database(entities = [ManagedApp::class], version = 3, exportSchema = false)

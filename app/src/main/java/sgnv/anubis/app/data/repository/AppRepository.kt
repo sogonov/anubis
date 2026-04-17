@@ -35,12 +35,13 @@ class AppRepository(
         dao.delete(packageName)
     }
 
-    /** Cycle through groups: none → LOCAL → VPN_ONLY → LAUNCH_VPN → none */
+    /** Cycle through groups: none → LOCAL → LOCAL_AUTO_UNFREEZE → VPN_ONLY → LAUNCH_VPN → none */
     suspend fun cycleGroup(packageName: String) {
         val current = dao.get(packageName)
         when (current?.group) {
             null -> dao.insert(ManagedApp(packageName, AppGroup.LOCAL))
-            AppGroup.LOCAL -> dao.insert(ManagedApp(packageName, AppGroup.VPN_ONLY))
+            AppGroup.LOCAL -> dao.insert(ManagedApp(packageName, AppGroup.LOCAL_AUTO_UNFREEZE))
+            AppGroup.LOCAL_AUTO_UNFREEZE -> dao.insert(ManagedApp(packageName, AppGroup.VPN_ONLY))
             AppGroup.VPN_ONLY -> dao.insert(ManagedApp(packageName, AppGroup.LAUNCH_VPN))
             AppGroup.LAUNCH_VPN -> dao.delete(packageName)
         }

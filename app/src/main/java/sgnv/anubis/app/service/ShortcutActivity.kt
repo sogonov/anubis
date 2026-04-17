@@ -49,7 +49,7 @@ class ShortcutActivity : ComponentActivity() {
             delay(200)
 
             when (group) {
-                AppGroup.LOCAL -> {
+                AppGroup.LOCAL, AppGroup.LOCAL_AUTO_UNFREEZE -> {
                     vpnClientManager.refreshVpnState()
                     vpnClientManager.detectActiveVpnClient()
                     val detectedPkg = vpnClientManager.activeVpnPackage.value

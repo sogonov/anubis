@@ -107,6 +107,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     }
 
     val noVpnCount = allApps.count { it.group == AppGroup.LOCAL }
+    val autoUnfreezeCount = allApps.count { it.group == AppGroup.LOCAL_AUTO_UNFREEZE }
     val vpnOnlyCount = allApps.count { it.group == AppGroup.VPN_ONLY }
     val launchCount = allApps.count { it.group == AppGroup.LAUNCH_VPN }
 
@@ -150,7 +151,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Без VPN: $noVpnCount | Только VPN: $vpnOnlyCount | С VPN: $launchCount",
+                    "Без VPN: $noVpnCount | Увед.: $autoUnfreezeCount | Только VPN: $vpnOnlyCount | С VPN: $launchCount",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f)
@@ -214,6 +215,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             GroupBadge("Без VPN", MaterialTheme.colorScheme.error)
+            GroupBadge("Увед.", MaterialTheme.colorScheme.secondary)
             GroupBadge("Только VPN", MaterialTheme.colorScheme.tertiary)
             GroupBadge("С VPN", MaterialTheme.colorScheme.primary)
         }
@@ -354,6 +356,7 @@ private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGro
 
     val containerColor = when (app.group) {
         AppGroup.LOCAL -> MaterialTheme.colorScheme.errorContainer
+        AppGroup.LOCAL_AUTO_UNFREEZE -> MaterialTheme.colorScheme.secondaryContainer
         AppGroup.VPN_ONLY -> MaterialTheme.colorScheme.tertiaryContainer
         AppGroup.LAUNCH_VPN -> MaterialTheme.colorScheme.primaryContainer
         null -> MaterialTheme.colorScheme.surface
@@ -413,6 +416,7 @@ private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGro
             Text(
                 when (app.group) {
                     AppGroup.LOCAL -> "Без VPN"
+                    AppGroup.LOCAL_AUTO_UNFREEZE -> "Увед."
                     AppGroup.VPN_ONLY -> "VPN"
                     AppGroup.LAUNCH_VPN -> "С VPN"
                     null -> "—"
@@ -421,6 +425,7 @@ private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGro
                 fontWeight = FontWeight.Bold,
                 color = when (app.group) {
                     AppGroup.LOCAL -> MaterialTheme.colorScheme.error
+                    AppGroup.LOCAL_AUTO_UNFREEZE -> MaterialTheme.colorScheme.secondary
                     AppGroup.VPN_ONLY -> MaterialTheme.colorScheme.tertiary
                     AppGroup.LAUNCH_VPN -> MaterialTheme.colorScheme.primary
                     null -> MaterialTheme.colorScheme.onSurfaceVariant
