@@ -418,7 +418,19 @@ private fun AppGroupSection(
     Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(8.dp))
 
-    val rows = (apps.size + 3) / 4
+    val pm = LocalContext.current.packageManager
+    val sortedApps = remember(apps) {
+        apps.sortedBy { app ->
+            try {
+                pm.getApplicationInfo(app.packageName, 0)
+                    .loadLabel(pm).toString().lowercase()
+            } catch (e: Exception) {
+                app.packageName.lowercase()
+            }
+        }
+    }
+
+    val rows = (sortedApps.size + 3) / 4
     val gridHeight = (rows * 88).dp
 
     LazyVerticalGrid(
@@ -428,7 +440,7 @@ private fun AppGroupSection(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         userScrollEnabled = false
     ) {
-        items(apps, key = { "${it.packageName}_$frozenVersion" }) { app ->
+        items(sortedApps, key = { "${it.packageName}_$frozenVersion" }) { app ->
             val isFrozen = viewModel.isAppFrozen(app.packageName)
             AppIconItem(
                 packageName = app.packageName,
