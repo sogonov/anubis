@@ -8,9 +8,14 @@ import sgnv.anubis.app.shizuku.ShizukuManager
 import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientManager
 import sgnv.anubis.app.vpn.VpnControlMode
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * Core logic:
@@ -214,19 +219,33 @@ class StealthOrchestrator(
 
     private suspend fun freezeGroup(group: AppGroup) {
         val packages = repository.getPackagesByGroup(group)
-        for (pkg in packages) {
-            if (shizukuManager.isAppInstalled(pkg) && !shizukuManager.isAppFrozen(pkg)) {
-                shizukuManager.freezeApp(pkg)
-            }
+        val sem = Semaphore(FREEZE_CONCURRENCY)
+        coroutineScope {
+            packages.map { pkg ->
+                async {
+                    sem.withPermit {
+                        if (shizukuManager.isAppInstalled(pkg) && !shizukuManager.isAppFrozen(pkg)) {
+                            shizukuManager.freezeApp(pkg)
+                        }
+                    }
+                }
+            }.awaitAll()
         }
     }
 
     private suspend fun unfreezeGroup(group: AppGroup) {
         val packages = repository.getPackagesByGroup(group)
-        for (pkg in packages) {
-            if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
-                shizukuManager.unfreezeApp(pkg)
-            }
+        val sem = Semaphore(FREEZE_CONCURRENCY)
+        coroutineScope {
+            packages.map { pkg ->
+                async {
+                    sem.withPermit {
+                        if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
+                            shizukuManager.unfreezeApp(pkg)
+                        }
+                    }
+                }
+            }.awaitAll()
         }
     }
 
@@ -266,6 +285,12 @@ class StealthOrchestrator(
     private fun fail(message: String) {
         _lastError.value = message
         _state.value = StealthState.DISABLED
+    }
+
+    private companion object {
+        // Cap on concurrent Shizuku IPC calls during group freeze/unfreeze.
+        // Higher values risk timing out on OEMs with stricter IPC backpressure (HyperOS cluster, #7).
+        const val FREEZE_CONCURRENCY = 4
     }
 }
 

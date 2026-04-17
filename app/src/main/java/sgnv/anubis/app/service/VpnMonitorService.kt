@@ -14,8 +14,13 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.R
 import sgnv.anubis.app.data.model.AppGroup
@@ -105,10 +110,17 @@ class VpnMonitorService : Service() {
 
         val repo = AppRepository(app.database.managedAppDao(), applicationContext)
         val packages = repo.getPackagesByGroup(group)
-        for (pkg in packages) {
-            if (shizukuManager.isAppInstalled(pkg) && !shizukuManager.isAppFrozen(pkg)) {
-                shizukuManager.freezeApp(pkg)
-            }
+        val sem = Semaphore(FREEZE_CONCURRENCY)
+        coroutineScope {
+            packages.map { pkg ->
+                async {
+                    sem.withPermit {
+                        if (shizukuManager.isAppInstalled(pkg) && !shizukuManager.isAppFrozen(pkg)) {
+                            shizukuManager.freezeApp(pkg)
+                        }
+                    }
+                }
+            }.awaitAll()
         }
     }
 
@@ -121,10 +133,17 @@ class VpnMonitorService : Service() {
 
         val repo = AppRepository(app.database.managedAppDao(), applicationContext)
         val packages = repo.getPackagesByGroup(group)
-        for (pkg in packages) {
-            if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
-                shizukuManager.unfreezeApp(pkg)
-            }
+        val sem = Semaphore(FREEZE_CONCURRENCY)
+        coroutineScope {
+            packages.map { pkg ->
+                async {
+                    sem.withPermit {
+                        if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
+                            shizukuManager.unfreezeApp(pkg)
+                        }
+                    }
+                }
+            }.awaitAll()
         }
     }
 
@@ -170,6 +189,9 @@ class VpnMonitorService : Service() {
         const val ACTION_START = "sgnv.anubis.app.START_MONITOR"
         const val ACTION_STOP = "sgnv.anubis.app.STOP_MONITOR"
         const val NOTIFICATION_ID = 1
+
+        // Mirrors StealthOrchestrator.FREEZE_CONCURRENCY — see comment there.
+        private const val FREEZE_CONCURRENCY = 4
 
         fun start(context: Context) {
             val intent = Intent(context, VpnMonitorService::class.java).apply {
