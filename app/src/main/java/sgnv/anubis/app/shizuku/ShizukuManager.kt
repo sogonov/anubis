@@ -127,12 +127,15 @@ class ShizukuManager(private val packageManager: PackageManager) {
         runCommand("am", "force-stop", packageName)
     }
 
+    // `cmd package` is a direct binder call into PackageManagerService. `pm` is a shell script
+    // that wraps `cmd package` but spawns a Dalvik VM on every invocation — ~100-200ms of pure
+    // JVM startup overhead per call. At 32 apps that adds up to seconds.
     suspend fun freezeApp(packageName: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCommand("pm", "disable-user", "--user", "0", packageName)
+        runCommand("cmd", "package", "disable-user", "--user", "0", packageName)
     }
 
     suspend fun unfreezeApp(packageName: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCommand("pm", "enable", packageName)
+        runCommand("cmd", "package", "enable", packageName)
     }
 
     fun isAppFrozen(packageName: String): Boolean {
