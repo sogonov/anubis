@@ -91,6 +91,9 @@ dependencies {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
 
+    // HiddenApiBypass — access to @hide IPackageManager/IActivityManager methods on Android 9+
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

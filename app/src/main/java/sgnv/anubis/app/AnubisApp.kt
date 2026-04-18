@@ -3,7 +3,9 @@ package sgnv.anubis.app
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.os.Build
 import kotlinx.coroutines.sync.Mutex
+import org.lsposed.hiddenapibypass.HiddenApiBypass
 import sgnv.anubis.app.data.db.AppDatabase
 import sgnv.anubis.app.shizuku.ShizukuManager
 
@@ -24,6 +26,13 @@ class AnubisApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Required on Android 9+ to reflect into @hide IPackageManager / IActivityManager
+        // methods used by the binder-based freeze path in ShizukuManager.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            HiddenApiBypass.addHiddenApiExemptions("L")
+        }
+
         createNotificationChannel()
 
         // Init Shizuku once — all components share this instance
