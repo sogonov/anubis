@@ -35,9 +35,20 @@
         <activity
             android:name=".service.ShortcutActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
-            android:exported="false"
+            android:exported="true"
             android:excludeFromRecents="true"
-            android:taskAffinity="" />
+            android:taskAffinity="">
+            <!-- anubis://<packageName> — launch a managed app from a URL.
+                 Enables integration with launcher widgets (AppFolderWidget, Tasker,
+                 etc.). Activity validates packageName against the managed-groups
+                 repository; unmanaged packages are rejected. Issue #9. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="anubis" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".service.VpnMonitorService"

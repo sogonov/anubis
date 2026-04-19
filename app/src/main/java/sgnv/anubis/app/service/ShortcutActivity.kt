@@ -16,17 +16,27 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Transparent activity launched from home screen shortcuts.
- * Uses shared ShizukuManager from Application — no wait loop needed.
+ * Transparent activity launched from home-screen pinned shortcuts AND from the
+ * `anubis://<packageName>` URL scheme (issue #9 — integration with launcher
+ * widgets like AppFolderWidget, Tasker, etc.).
+ *
+ * Two entry paths:
+ *  - Pinned shortcut: internal [android.content.Intent] with `package` / `group`
+ *    extras, created by [sgnv.anubis.app.ui.MainViewModel.createShortcut].
+ *  - URL: external `anubis://ru.ozon.app.android` — packageName comes from the
+ *    URI host, group is always looked up via the repository. Unmanaged packages
+ *    are rejected (finish without action) so arbitrary apps cannot unfreeze each
+ *    other through this activity.
  */
 class ShortcutActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val packageName = intent.getStringExtra("package") ?: run { finish(); return }
-        val groupName = intent.getStringExtra("group") ?: AppGroup.LAUNCH_VPN.name
-        val group = try { AppGroup.valueOf(groupName) } catch (e: Exception) { AppGroup.LAUNCH_VPN }
+        val data = intent.data
+        val isUrlLaunch = data?.scheme == URL_SCHEME
+        val packageName = if (isUrlLaunch) data?.host else intent.getStringExtra("package")
+        if (packageName.isNullOrBlank()) { finish(); return }
 
         val app = applicationContext as AnubisApp
         val shizukuManager = app.shizukuManager
@@ -48,6 +58,18 @@ class ShortcutActivity : ComponentActivity() {
             // Brief delay for UserService callback
             delay(200)
 
+            // Resolve group. Repository is authoritative; extras are a legacy fallback
+            // for pinned shortcuts created before this change. URL-launch never falls
+            // back to extras — if the package isn't managed, silently finish.
+            val managedGroup = repository.getAppGroup(packageName)
+            val group = when {
+                managedGroup != null -> managedGroup
+                isUrlLaunch -> { finish(); return@launch }
+                else -> intent.getStringExtra("group")
+                    ?.let { runCatching { AppGroup.valueOf(it) }.getOrNull() }
+                    ?: AppGroup.LAUNCH_VPN
+            }
+
             when (group) {
                 AppGroup.LOCAL, AppGroup.LOCAL_AUTO_UNFREEZE -> {
                     vpnClientManager.refreshVpnState()
@@ -66,5 +88,9 @@ class ShortcutActivity : ComponentActivity() {
             vpnClientManager.stopMonitoringVpn()
             finish()
         }
+    }
+
+    companion object {
+        const val URL_SCHEME = "anubis"
     }
 }
