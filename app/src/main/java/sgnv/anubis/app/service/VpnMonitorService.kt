@@ -187,6 +187,7 @@ class VpnMonitorService : Service() {
                 }
             }
         }
+        StealthWidgetProvider.updateAllWidgets(applicationContext)
     }
 
     private fun buildNotification(): Notification {
