@@ -2,6 +2,7 @@ package sgnv.anubis.app.ui.screens
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,17 +17,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,13 +40,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.ui.MainViewModel
 
 /**
  * Bottom sheet for inline add-to-group flow on the Home screen.
- * Lists non-system, non-disabled installed apps (filtered by search) and tapping one
- * assigns it to [targetGroup]. If the app is already in another group — it's moved.
+ * Lists non-system, non-disabled installed apps (filtered by search) and lets user
+ * select several apps for adding to [targetGroup] at once.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +59,11 @@ fun AddAppSheet(
     val allApps by viewModel.installedApps.collectAsState()
     val context = LocalContext.current
     val pm = context.packageManager
+    val scope = rememberCoroutineScope()
 
     var query by rememberSaveable { mutableStateOf("") }
+    var selectedPackages by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var isApplying by remember { mutableStateOf(false) }
     val normalizedQuery = query.trim()
 
     val candidates = remember(allApps) {
@@ -117,6 +126,7 @@ fun AddAppSheet(
                     }
                 }
                 items(filtered, key = { it.packageName }) { app ->
+                    val isSelected = app.packageName in selectedPackages
                     val iconBitmap = remember(app.packageName) {
                         try {
                             val drawable = pm.getApplicationIcon(app.packageName)
@@ -135,8 +145,11 @@ fun AddAppSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                viewModel.setAppGroup(app.packageName, targetGroup)
-                                onDismiss()
+                                selectedPackages = if (isSelected) {
+                                    selectedPackages - app.packageName
+                                } else {
+                                    selectedPackages + app.packageName
+                                }
                             }
                             .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -169,8 +182,48 @@ fun AddAppSheet(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(Modifier.width(8.dp))
                         }
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { checked ->
+                                selectedPackages = if (checked) {
+                                    selectedPackages + app.packageName
+                                } else {
+                                    selectedPackages - app.packageName
+                                }
+                            }
+                        )
                     }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = { selectedPackages = emptySet() },
+                    enabled = selectedPackages.isNotEmpty() && !isApplying,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Сбросить")
+                }
+                Button(
+                    onClick = {
+                        val packagesToAssign = selectedPackages.toList()
+                        scope.launch {
+                            isApplying = true
+                            viewModel.setAppsGroup(packagesToAssign, targetGroup)
+                            val message = "Добавлено ${packagesToAssign.size} приложений"
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            onDismiss()
+                        }
+                    },
+                    enabled = selectedPackages.isNotEmpty() && !isApplying,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Готово")
                 }
             }
             Spacer(Modifier.height(16.dp))

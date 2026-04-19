@@ -305,10 +305,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Directly assign an app to a specific group (used by the Home-screen inline add picker). */
-    fun setAppGroup(packageName: String, group: AppGroup) {
-        viewModelScope.launch {
+    /** Directly assign an apps to a specific group (used by the Home-screen inline add picker). */
+    suspend fun setAppsGroup(
+        packageNames: Collection<String>,
+        group: AppGroup
+    ) {
+        for (packageName in packageNames) {
             repository.setAppGroup(packageName, group)
+        }
+        if (packageNames.isNotEmpty()) {
             loadInstalledApps()
             loadGroupedApps()
         }
