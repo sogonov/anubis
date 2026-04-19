@@ -1,15 +1,20 @@
 package sgnv.anubis.app.shizuku
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
+import android.os.Process
 import sgnv.anubis.app.IUserService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
+import rikka.shizuku.ShizukuBinderWrapper
+import rikka.shizuku.SystemServiceHelper
 
 class ShizukuManager(private val packageManager: PackageManager) {
 
@@ -123,19 +128,38 @@ class ShizukuManager(private val packageManager: PackageManager) {
         runCommand(*args)
     }
 
+    /**
+     * Force-stops a package via `IActivityManager.forceStopPackage` through a Shizuku-wrapped
+     * binder. Bypasses the `am force-stop` shell wrapper, which on some OEM builds
+     * (HyperOS / HiOS / MIUI) runs inside a restricted shell environment where it silently
+     * no-ops. Binder IPC is not touched by OEM shell sandboxes.
+     */
     suspend fun forceStopApp(packageName: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCommand("am", "force-stop", packageName)
+        forceStopInternal(packageName)
     }
 
-    // `cmd package` is a direct binder call into PackageManagerService. `pm` is a shell script
-    // that wraps `cmd package` but spawns a Dalvik VM on every invocation — ~100-200ms of pure
-    // JVM startup overhead per call. At 32 apps that adds up to seconds.
+    /**
+     * Freezes a package by calling `IPackageManager.setApplicationEnabledSetting(DISABLED_USER)`
+     * via Shizuku binder, preceded by `IActivityManager.forceStopPackage` to stop any running
+     * components (matches Hail's approach — without the stop, background services can linger
+     * briefly before the disable state takes effect).
+     *
+     * This path was added in v0.1.5 to fix #7/#33/#44/#58 — HyperOS/HiOS/MIUI modify the
+     * `com.android.shell` environment such that `pm disable-user` / `cmd package disable-user`
+     * either times out or returns success without effect. Binder IPC is preserved by OEMs
+     * (required for OS function), so direct Binder calls work where shell does not.
+     */
     suspend fun freezeApp(packageName: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCommand("cmd", "package", "disable-user", "--user", "0", packageName)
+        forceStopInternal(packageName)
+        setAppEnabledState(packageName, enabled = false)
     }
 
+    /**
+     * Unfreezes a package by setting `COMPONENT_ENABLED_STATE_ENABLED` via the same
+     * binder path as `freezeApp`.
+     */
     suspend fun unfreezeApp(packageName: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCommand("cmd", "package", "enable", packageName)
+        setAppEnabledState(packageName, enabled = true)
     }
 
     fun isAppFrozen(packageName: String): Boolean {
@@ -183,8 +207,63 @@ class ShizukuManager(private val packageManager: PackageManager) {
         }
     }
 
+    // --- Binder-based privileged ops ---
+
+    /**
+     * Wraps a system-service binder with Shizuku's binder wrapper (which rewrites the
+     * caller UID to shell/root) and returns the AIDL interface via its `$Stub.asInterface`.
+     * Works for any `android.os.IInterface` whose `Stub.asInterface(IBinder)` static exists.
+     */
+    private fun asInterface(className: String, serviceName: String): Any {
+        val binder = SystemServiceHelper.getSystemService(serviceName)
+        val wrapped = ShizukuBinderWrapper(binder)
+        val stubClass = Class.forName("$className\$Stub")
+        return HiddenApiBypass.invoke(stubClass, null, "asInterface", wrapped)
+    }
+
+    private fun setAppEnabledState(packageName: String, enabled: Boolean): Result<Unit> =
+        runCatching {
+            val pm = asInterface("android.content.pm.IPackageManager", "package")
+            val newState = if (enabled) {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER
+            }
+            // setApplicationEnabledSetting(String pkg, int newState, int flags, int userId, String callingPackage)
+            pm::class.java.getMethod(
+                "setApplicationEnabledSetting",
+                String::class.java,
+                Int::class.java,
+                Int::class.java,
+                Int::class.java,
+                String::class.java
+            ).invoke(pm, packageName, newState, 0, currentUserId, CALLER_PACKAGE)
+            Unit
+        }
+
+    private fun forceStopInternal(packageName: String): Result<Unit> = runCatching {
+        val am = asInterface("android.app.IActivityManager", Context.ACTIVITY_SERVICE)
+        HiddenApiBypass.invoke(
+            am::class.java, am, "forceStopPackage", packageName, currentUserId
+        )
+        Unit
+    }
+
     companion object {
         const val REQUEST_CODE = 1001
+
+        /**
+         * Caller package passed to `setApplicationEnabledSetting`. `com.android.shell` matches
+         * the UID Shizuku exposes (when running in ADB mode), which PackageManagerService
+         * validates against on some API levels.
+         */
+        private const val CALLER_PACKAGE = "com.android.shell"
+
+        /**
+         * Main user ID for this process. For app UIDs Android encodes userId as `uid / 100_000`
+         * (see `UserHandle.PER_USER_RANGE`). Cached — process UID doesn't change.
+         */
+        private val currentUserId: Int = Process.myUid() / 100_000
     }
 }
 
