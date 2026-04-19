@@ -83,6 +83,21 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.StealthWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stealth_info" />
+        </receiver>
+
+        <service
+            android:name=".service.StealthWidgetService"
+            android:exported="false" />
+
         <!-- Shizuku provider -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

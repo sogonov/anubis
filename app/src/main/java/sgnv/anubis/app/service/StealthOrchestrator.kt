@@ -62,6 +62,10 @@ class StealthOrchestrator(
         }
     }
 
+    /** Short status string for widget display; null when idle. */
+    private val _progressText = MutableStateFlow<String?>(null)
+    val progressText: StateFlow<String?> = _progressText
+
     /** Version counter — incremented on any freeze/unfreeze to trigger UI refresh */
     private val _frozenVersion = MutableStateFlow(0L)
     val frozenVersion: StateFlow<Long> = _frozenVersion
@@ -85,6 +89,7 @@ class StealthOrchestrator(
             return
         }
 
+        _progressText.value = "Замораживаю..."
         val mutex = (context.applicationContext as AnubisApp).groupOpMutex
         val benchStart = System.currentTimeMillis()
         val frozen = mutex.withLock {
@@ -92,9 +97,11 @@ class StealthOrchestrator(
         }
         emitBenchmark(frozen = frozen, unfrozen = 0, startMs = benchStart)
 
+        _progressText.value = "Запускаю VPN..."
         vpnClientManager.startVPN(client)
 
         bumpVersion()
+        _progressText.value = null
 
         if (client.controlMode == VpnControlMode.MANUAL) {
             _lastError.value = "Подключите VPN вручную в ${client.displayName}"
@@ -112,15 +119,19 @@ class StealthOrchestrator(
         _state.value = StealthState.DISABLING
 
         if (vpnClientManager.vpnActive.value) {
+            _progressText.value = "Отключаю VPN..."
             if (!stopVpn(client, detectedPackage)) {
+                _progressText.value = null
                 _lastError.value = "Не удалось отключить VPN. Приложения НЕ разморожены."
                 _state.value = StealthState.ENABLED
                 return
             }
         }
 
+        _progressText.value = "Размораживаю..."
         // After confirmed VPN shutdown, align managed groups with the new network state.
         applyManagedStateForVpn(active = false)
+        _progressText.value = null
     }
 
     /**
@@ -328,6 +339,7 @@ class StealthOrchestrator(
     }
 
     private fun fail(message: String) {
+        _progressText.value = null
         _lastError.value = message
         _state.value = StealthState.DISABLED
     }
