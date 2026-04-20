@@ -156,9 +156,10 @@ class ShizukuManager(private val packageManager: PackageManager) {
         userService = null
     }
 
-    suspend fun execShellCommand(vararg args: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCommand(*args)
-    }
+    suspend fun execShellCommand(vararg args: String): Result<Unit> =
+        withTimeoutOrNull(SHELL_CMD_TIMEOUT_MS) {
+            withContext(Dispatchers.IO) { runCommand(*args) }
+        } ?: Result.failure(RuntimeException("execShellCommand timed out: ${args.joinToString(" ")}"))
 
     /**
      * Force-stops a package via `IActivityManager.forceStopPackage` through a Shizuku-wrapped
@@ -166,9 +167,10 @@ class ShizukuManager(private val packageManager: PackageManager) {
      * (HyperOS / HiOS / MIUI) runs inside a restricted shell environment where it silently
      * no-ops. Binder IPC is not touched by OEM shell sandboxes.
      */
-    suspend fun forceStopApp(packageName: String): Result<Unit> = withContext(Dispatchers.IO) {
-        forceStopInternal(packageName)
-    }
+    suspend fun forceStopApp(packageName: String): Result<Unit> =
+        withTimeoutOrNull(BINDER_OP_TIMEOUT_MS) {
+            withContext(Dispatchers.IO) { forceStopInternal(packageName) }
+        } ?: Result.failure(RuntimeException("forceStopApp timed out: $packageName"))
 
     /**
      * Freezes a package by calling `IPackageManager.setApplicationEnabledSetting(DISABLED_USER)`
@@ -221,14 +223,17 @@ class ShizukuManager(private val packageManager: PackageManager) {
     /**
      * Run a shell command and return its stdout output.
      */
-    suspend fun runCommandWithOutput(vararg args: String): String? = withContext(Dispatchers.IO) {
-        try {
-            val service = userService ?: return@withContext null
-            service.execCommandWithOutput(args.toList().toTypedArray())
-        } catch (e: Exception) {
-            null
+    suspend fun runCommandWithOutput(vararg args: String): String? =
+        withTimeoutOrNull(SHELL_CMD_TIMEOUT_MS) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val service = userService ?: return@withContext null
+                    service.execCommandWithOutput(args.toList().toTypedArray())
+                } catch (e: Exception) {
+                    null
+                }
+            }
         }
-    }
 
     private fun runCommand(vararg args: String): Result<Unit> {
         return try {
@@ -301,6 +306,14 @@ class ShizukuManager(private val packageManager: PackageManager) {
          * to prevent the groupOpMutex from being held indefinitely on a hung call.
          */
         private const val BINDER_OP_TIMEOUT_MS = 5_000L
+
+        /**
+         * Shell commands forwarded through the Shizuku UserService binder. Typical durations:
+         * `am broadcast` / `am start` < 1 s, `dumpsys connectivity` 1–3 s on busy devices.
+         * 10 s caps the rare case where the UserService binder stalls — otherwise
+         * orchestrator.enable/disable would hang inside startVPN/detectActiveVpnClient.
+         */
+        private const val SHELL_CMD_TIMEOUT_MS = 10_000L
 
         /**
          * Main user ID for this process. For app UIDs Android encodes userId as `uid / 100_000`

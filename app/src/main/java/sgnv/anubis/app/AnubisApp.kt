@@ -4,6 +4,9 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.sync.Mutex
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import sgnv.anubis.app.data.db.AppDatabase
@@ -40,6 +43,15 @@ class AnubisApp : Application() {
      * target state, and returns without doing any work.
      */
     val groupOpMutex: Mutex = Mutex()
+
+    /**
+     * Process-wide scope for orchestrator work that must outlive any single suspension
+     * point. Used so enable()/disable() can launch the freeze/VPN sequence in a detached
+     * Job and wait via job.join() with a hard timeout — if the underlying binder hangs,
+     * the user-facing state recovers even though the orphan continues running until
+     * the binder eventually returns.
+     */
+    val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
