@@ -2,20 +2,65 @@ package sgnv.anubis.app.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientType
 
 /** Centralized SharedPreferences keys for app-level settings. */
 object AppSettings {
     const val PREFS_NAME = "settings"
+    private const val SECURE_PREFS_NAME = "settings_secure"
     const val KEY_VPN_CLIENT_PACKAGE = "vpn_client_package"
     const val KEY_BACKGROUND_MONITORING = "background_monitoring"
     const val KEY_FREEZE_ON_BOOT = "freeze_on_boot"
     const val KEY_UNFREEZE_ON_VPN_TOGGLE = "unfreeze_on_vpn_toggle"
     private const val KEY_VPN_CLIENT_AUTOMATION_TOKEN_PREFIX = "vpn_client_automation_token_"
+    private const val TAG = "AppSettings"
+
+    @Volatile
+    private var securePrefsCache: SharedPreferences? = null
 
     fun prefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    private fun securePrefs(context: Context): SharedPreferences? {
+        securePrefsCache?.let { return it }
+        return synchronized(this) {
+            securePrefsCache?.let { return@synchronized it }
+            runCatching {
+                val appContext = context.applicationContext
+                val masterKey = MasterKey.Builder(appContext)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                EncryptedSharedPreferences.create(
+                    appContext,
+                    SECURE_PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to open encrypted preferences for VPN automation tokens", error)
+            }.getOrNull()?.also { securePrefsCache = it }
+        }
+    }
+
+    private fun automationTokenKey(packageName: String): String =
+        "$KEY_VPN_CLIENT_AUTOMATION_TOKEN_PREFIX$packageName"
+
+    private fun migrateLegacyAutomationTokenIfNeeded(context: Context, packageName: String): String? {
+        val key = automationTokenKey(packageName)
+        val securePrefs = securePrefs(context) ?: return null
+        securePrefs.getString(key, null)?.takeIf { it.isNotBlank() }?.let { return it }
+
+        val legacyPrefs = prefs(context)
+        val legacyToken = legacyPrefs.getString(key, null)?.takeIf { it.isNotBlank() } ?: return null
+        securePrefs.edit().putString(key, legacyToken).apply()
+        legacyPrefs.edit().remove(key).apply()
+        return legacyToken
     }
 
     /** Optional behavior: unfreeze the opposite managed group after VPN state changes. */
@@ -24,20 +69,23 @@ object AppSettings {
     }
 
     fun getVpnClientAutomationToken(context: Context, packageName: String): String? {
-        return prefs(context)
-            .getString("$KEY_VPN_CLIENT_AUTOMATION_TOKEN_PREFIX$packageName", null)
+        return migrateLegacyAutomationTokenIfNeeded(context, packageName)
+            ?: securePrefs(context)
+            ?.getString(automationTokenKey(packageName), null)
             ?.takeIf { it.isNotBlank() }
     }
 
     fun setVpnClientAutomationToken(context: Context, packageName: String, token: String?) {
-        val editor = prefs(context).edit()
-        val key = "$KEY_VPN_CLIENT_AUTOMATION_TOKEN_PREFIX$packageName"
+        val securePrefs = securePrefs(context) ?: return
+        val editor = securePrefs.edit()
+        val key = automationTokenKey(packageName)
         if (token.isNullOrBlank()) {
             editor.remove(key)
         } else {
             editor.putString(key, token)
         }
         editor.apply()
+        prefs(context).edit().remove(key).apply()
     }
 
     fun loadSelectedVpnClient(
