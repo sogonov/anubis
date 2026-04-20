@@ -59,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.model.ManagedApp
 import sgnv.anubis.app.service.StealthState
 import sgnv.anubis.app.shizuku.SHIZUKU_PACKAGE
@@ -110,8 +111,11 @@ fun HomeScreen(
 
     // Context menu state
     var menuApp by remember { mutableStateOf<String?>(null) }
+    val dismissMenuSheet: () -> Unit = { menuApp = null }
+
     // Inline "add to group" sheet: non-null means that group's sheet is open.
-    var addingToGroup by remember { mutableStateOf<sgnv.anubis.app.data.model.AppGroup?>(null) }
+    var addingToGroup by remember { mutableStateOf<AppGroup?>(null) }
+    val dismissAddSheet: () -> Unit = { addingToGroup = null }
 
     // Ephemeral benchmark message. Conflate-style: each new emit overwrites the previous
     // and resets the 3s hide timer. Avoids flicker if multiple emits arrive in a burst
@@ -241,7 +245,7 @@ fun HomeScreen(
                                 if (launch != null) context.startActivity(launch)
                             }) { Text("Открыть Shizuku") }
                             ShizukuStatus.NO_PERMISSION -> Button(onClick = { viewModel.requestShizukuPermission() }) { Text("Разрешить") }
-                            ShizukuStatus.READY -> Unit
+                            ShizukuStatus.READY -> Unit // unreachable
                         }
                     }
                 }
@@ -260,7 +264,7 @@ fun HomeScreen(
                 frozenVersion = frozenVersion,
                 onClick = { pkg -> viewModel.launchLocal(pkg) },
                 onLongClick = { pkg -> menuApp = pkg },
-                onAdd = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LOCAL_AUTO_UNFREEZE }
+                onAdd = { addingToGroup = AppGroup.LOCAL_AUTO_UNFREEZE }
             )
         }
 
@@ -275,7 +279,7 @@ fun HomeScreen(
                 frozenVersion = frozenVersion,
                 onClick = { pkg -> viewModel.launchLocal(pkg) },
                 onLongClick = { pkg -> menuApp = pkg },
-                onAdd = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LOCAL }
+                onAdd = { addingToGroup = AppGroup.LOCAL }
             )
         }
 
@@ -290,7 +294,7 @@ fun HomeScreen(
                 frozenVersion = frozenVersion,
                 onClick = { pkg -> viewModel.launchWithVpn(pkg) },
                 onLongClick = { pkg -> menuApp = pkg },
-                onAdd = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LAUNCH_VPN }
+                onAdd = { addingToGroup = AppGroup.LAUNCH_VPN }
             )
         }
 
@@ -305,7 +309,7 @@ fun HomeScreen(
                 frozenVersion = frozenVersion,
                 onClick = { pkg -> viewModel.launchWithVpn(pkg) },
                 onLongClick = { pkg -> menuApp = pkg },
-                onAdd = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.VPN_ONLY }
+                onAdd = { addingToGroup = AppGroup.VPN_ONLY }
             )
         }
 
@@ -323,22 +327,22 @@ fun HomeScreen(
                 EmptyGroupAddButton(
                     label = "Без VPN + уведомления",
                     tint = MaterialTheme.colorScheme.secondary,
-                    onClick = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LOCAL_AUTO_UNFREEZE }
+                    onClick = { addingToGroup = AppGroup.LOCAL_AUTO_UNFREEZE }
                 )
                 EmptyGroupAddButton(
                     label = "Без VPN",
                     tint = MaterialTheme.colorScheme.error,
-                    onClick = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LOCAL }
+                    onClick = { addingToGroup = AppGroup.LOCAL }
                 )
                 EmptyGroupAddButton(
                     label = "Запуск с VPN",
                     tint = MaterialTheme.colorScheme.primary,
-                    onClick = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.LAUNCH_VPN }
+                    onClick = { addingToGroup = AppGroup.LAUNCH_VPN }
                 )
                 EmptyGroupAddButton(
                     label = "Только VPN",
                     tint = MaterialTheme.colorScheme.tertiary,
-                    onClick = { addingToGroup = sgnv.anubis.app.data.model.AppGroup.VPN_ONLY }
+                    onClick = { addingToGroup = AppGroup.VPN_ONLY }
                 )
             }
         }
@@ -446,7 +450,7 @@ fun HomeScreen(
         AddAppSheet(
             viewModel = viewModel,
             targetGroup = group,
-            onDismiss = { addingToGroup = null }
+            onDismiss = dismissAddSheet
         )
     }
 
@@ -473,7 +477,7 @@ fun HomeScreen(
         }
 
         ModalBottomSheet(
-            onDismissRequest = { menuApp = null },
+            onDismissRequest = dismissMenuSheet,
             sheetState = rememberModalBottomSheetState()
         ) {
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
@@ -505,14 +509,14 @@ fun HomeScreen(
                 // Actions
                 BottomSheetAction(
                     text = if (isFrozen) "Разморозить" else "Заморозить",
-                    onClick = { viewModel.requestToggleAppFrozen(pkg); menuApp = null }
+                    onClick = { viewModel.requestToggleAppFrozen(pkg); dismissMenuSheet() }
                 )
 
                 BottomSheetAction(
                     text = "Создать ярлык на рабочий стол",
                     onClick = {
                         viewModel.createShortcut(pkg)
-                        menuApp = null
+                        dismissMenuSheet()
                     }
                 )
 
@@ -520,7 +524,7 @@ fun HomeScreen(
                     text = "Убрать из группы",
                     onClick = {
                         viewModel.removeFromGroup(pkg)
-                        menuApp = null
+                        dismissMenuSheet()
                     }
                 )
 

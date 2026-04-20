@@ -276,7 +276,6 @@ class ShizukuManager(private val packageManager: PackageManager) {
                 Int::class.java,
                 String::class.java
             ).invoke(pm, packageName, newState, 0, currentUserId, CALLER_PACKAGE)
-            Unit
         }
 
     private fun forceStopInternal(packageName: String): Result<Unit> = runCatching {
@@ -284,7 +283,6 @@ class ShizukuManager(private val packageManager: PackageManager) {
         HiddenApiBypass.invoke(
             am::class.java, am, "forceStopPackage", packageName, currentUserId
         )
-        Unit
     }
 
     companion object {

@@ -142,7 +142,7 @@ fun SettingsScreen(
                                 ShizukuStatus.NOT_INSTALLED -> "Нажмите, чтобы скачать"
                                 ShizukuStatus.NOT_RUNNING -> "Нажмите, чтобы открыть Shizuku"
                                 ShizukuStatus.NO_PERMISSION -> "Нажмите, чтобы выдать разрешение"
-                                ShizukuStatus.READY -> ""
+                                ShizukuStatus.READY -> "" // unreachable
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
