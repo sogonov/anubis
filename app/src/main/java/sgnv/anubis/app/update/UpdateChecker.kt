@@ -1,6 +1,7 @@
 package sgnv.anubis.app.update
 
 import android.content.Context
+import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -29,12 +30,12 @@ object UpdateChecker {
 
     fun setEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_ENABLED, enabled).apply()
+            .edit {putBoolean(KEY_ENABLED, enabled)}
     }
 
     fun skipVersion(context: Context, version: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(KEY_SKIPPED_VERSION, version).apply()
+            .edit { putString(KEY_SKIPPED_VERSION, version)}
     }
 
     private fun skippedVersion(context: Context): String? =
@@ -87,7 +88,7 @@ object UpdateChecker {
                 found
             }
 
-            prefs.edit().putLong(KEY_LAST_CHECK_MS, now).apply()
+            prefs.edit { putLong(KEY_LAST_CHECK_MS, now) }
 
             UpdateInfo(
                 latestVersion = tagName,

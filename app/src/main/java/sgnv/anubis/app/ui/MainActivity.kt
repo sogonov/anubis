@@ -1,6 +1,5 @@
 package sgnv.anubis.app.ui
 
-import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,7 +40,7 @@ class MainActivity : ComponentActivity() {
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+        if (result.resultCode == RESULT_OK) {
             // VPN permission granted — now proceed with stealth toggle
             viewModelRef?.toggleStealth()
         }

@@ -1,6 +1,5 @@
 package sgnv.anubis.app.service
 
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import sgnv.anubis.app.AnubisApp

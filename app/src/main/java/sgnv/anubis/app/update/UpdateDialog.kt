@@ -1,7 +1,7 @@
 package sgnv.anubis.app.update
 
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -46,7 +46,7 @@ fun UpdateDialog(
         confirmButton = {
             TextButton(onClick = {
                 val url = info.apkUrl ?: info.releaseUrl
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
                 onDismiss()
             }) { Text(if (info.apkUrl != null) "Скачать APK" else "Открыть релиз") }
         },

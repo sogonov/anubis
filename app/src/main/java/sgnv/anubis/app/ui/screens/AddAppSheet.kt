@@ -1,6 +1,5 @@
 package sgnv.anubis.app.ui.screens
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -43,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.ui.MainViewModel
+import androidx.core.graphics.createBitmap
 
 /**
  * Bottom sheet for inline add-to-group flow on the Home screen.
@@ -130,10 +130,9 @@ fun AddAppSheet(
                     val iconBitmap = remember(app.packageName) {
                         try {
                             val drawable = pm.getApplicationIcon(app.packageName)
-                            val bmp = Bitmap.createBitmap(
+                            val bmp = createBitmap(
                                 drawable.intrinsicWidth.coerceAtLeast(1),
-                                drawable.intrinsicHeight.coerceAtLeast(1),
-                                Bitmap.Config.ARGB_8888
+                                drawable.intrinsicHeight.coerceAtLeast(1)
                             )
                             val canvas = Canvas(bmp)
                             drawable.setBounds(0, 0, canvas.width, canvas.height)

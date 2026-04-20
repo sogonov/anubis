@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.ui.MainViewModel
 
@@ -223,7 +224,7 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     val intent = android.content.Intent(
                         android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://github.com/sogonov/anubis")
+                        "https://github.com/sogonov/anubis".toUri()
                     )
                     context.startActivity(intent)
                 }) {

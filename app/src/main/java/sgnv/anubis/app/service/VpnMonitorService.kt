@@ -62,7 +62,7 @@ class VpnMonitorService : Service() {
     private fun startVpnMonitoring() {
         if (networkCallback != null) return
 
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
@@ -99,7 +99,7 @@ class VpnMonitorService : Service() {
     private fun stopVpnMonitoring() {
         networkCallback?.let {
             try {
-                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
                 cm.unregisterNetworkCallback(it)
             } catch (_: Exception) {}
             networkCallback = null

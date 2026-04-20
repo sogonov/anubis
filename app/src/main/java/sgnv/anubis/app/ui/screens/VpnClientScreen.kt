@@ -1,6 +1,6 @@
 package sgnv.anubis.app.ui.screens
 
-import android.graphics.Bitmap
+import androidx.core.graphics.createBitmap
 import android.graphics.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -266,10 +266,9 @@ fun VpnClientScreen(
                 val iconBitmap = remember(app.packageName) {
                     try {
                         val drawable = pm.getApplicationIcon(app.packageName)
-                        val bmp = Bitmap.createBitmap(
+                        val bmp = createBitmap(
                             drawable.intrinsicWidth.coerceAtLeast(1),
-                            drawable.intrinsicHeight.coerceAtLeast(1),
-                            Bitmap.Config.ARGB_8888
+                            drawable.intrinsicHeight.coerceAtLeast(1)
                         )
                         val canvas = Canvas(bmp)
                         drawable.setBounds(0, 0, canvas.width, canvas.height)

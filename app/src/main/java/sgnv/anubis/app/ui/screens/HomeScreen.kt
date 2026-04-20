@@ -1,8 +1,9 @@
 package sgnv.anubis.app.ui.screens
 
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.core.net.toUri
+import androidx.core.graphics.createBitmap
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -222,9 +223,9 @@ fun HomeScreen(
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (shizukuStatus == ShizukuStatus.UNAVAILABLE) {
                             Button(onClick = {
-                                context.startActivity(android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://shizuku.rikka.app/download/")
+                                context.startActivity(Intent(
+                                    Intent.ACTION_VIEW,
+                                    "https://shizuku.rikka.app/download/".toUri()
                                 ))
                             }) { Text("Скачать") }
                         }
@@ -390,10 +391,7 @@ fun HomeScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    context.startActivity(android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse(url)
-                    ))
+                    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
                     viewModel.dismissDangerousAppWarning()
                 }) { Text("Подробнее") }
             },
@@ -424,11 +422,9 @@ fun HomeScreen(
         val iconBitmap = remember(pkg) {
             try {
                 val drawable = pm.getApplicationIcon(pkg)
-                val bmp = Bitmap.createBitmap(
+                val bmp = createBitmap(
                     drawable.intrinsicWidth.coerceAtLeast(1),
-                    drawable.intrinsicHeight.coerceAtLeast(1),
-                    Bitmap.Config.ARGB_8888
-                )
+                    drawable.intrinsicHeight.coerceAtLeast(1))
                 val canvas = Canvas(bmp)
                 drawable.setBounds(0, 0, canvas.width, canvas.height)
                 drawable.draw(canvas)
@@ -583,10 +579,9 @@ private fun AppIconItem(
     val iconBitmap = remember(packageName) {
         try {
             val drawable = pm.getApplicationIcon(packageName)
-            val bmp = Bitmap.createBitmap(
+            val bmp = createBitmap(
                 drawable.intrinsicWidth.coerceAtLeast(1),
-                drawable.intrinsicHeight.coerceAtLeast(1),
-                Bitmap.Config.ARGB_8888
+                drawable.intrinsicHeight.coerceAtLeast(1)
             )
             val canvas = Canvas(bmp)
             drawable.setBounds(0, 0, canvas.width, canvas.height)

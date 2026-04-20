@@ -25,7 +25,8 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
-import android.graphics.Bitmap
+import androidx.core.graphics.createBitmap
+import androidx.core.content.edit
 import android.graphics.Canvas
 import android.graphics.drawable.Icon
 import android.graphics.drawable.AdaptiveIconDrawable
@@ -235,10 +236,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .roundToInt()
                 .coerceAtLeast(1)
 
-            val bmp = Bitmap.createBitmap(
-                fullSize,
-                fullSize,
-                Bitmap.Config.ARGB_8888)
+            val bmp = createBitmap(fullSize, fullSize)
             val canvas = Canvas(bmp)
             drawable.background?.let { bg ->
                 bg.setBounds(0, 0, fullSize, fullSize)
@@ -250,10 +248,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             Icon.createWithAdaptiveBitmap(bmp)
         } else {
-            val bmp = Bitmap.createBitmap(
-                visibleSize,
-                visibleSize,
-                Bitmap.Config.ARGB_8888)
+            val bmp = createBitmap(visibleSize, visibleSize)
             val canvas = Canvas(bmp)
             drawable.setBounds(0, 0, visibleSize, visibleSize)
             drawable.draw(canvas)
@@ -401,9 +396,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectVpnClient(client: SelectedVpnClient) {
         _selectedVpnClient.value = client
         AppSettings.prefs(getApplication())
-            .edit()
-            .putString(AppSettings.KEY_VPN_CLIENT_PACKAGE, client.packageName)
-            .apply()
+            .edit {
+                putString(AppSettings.KEY_VPN_CLIENT_PACKAGE, client.packageName)
+            }
     }
 
     fun isVpnClientEnabled(packageName: String): Boolean {
@@ -416,9 +411,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _backgroundMonitoring.value = enabled
         val app = getApplication<Application>()
         AppSettings.prefs(app)
-            .edit()
-            .putBoolean(AppSettings.KEY_BACKGROUND_MONITORING, enabled)
-            .apply()
+            .edit {
+                putBoolean(AppSettings.KEY_BACKGROUND_MONITORING, enabled)
+            }
         if (enabled) {
             VpnMonitorService.start(app)
         } else {
@@ -439,9 +434,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _unfreezeManagedAppsOnVpnToggle.value = enabled
         // Persist immediately so orchestrators and services pick the flag up without restart.
         AppSettings.prefs(getApplication())
-            .edit()
-            .putBoolean(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE, enabled)
-            .apply()
+            .edit {
+                putBoolean(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE, enabled)
+            }
     }
 
     private fun loadUnfreezeManagedAppsOnVpnToggle() {

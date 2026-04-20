@@ -1,8 +1,9 @@
 package sgnv.anubis.app.ui.screens
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.core.content.edit
+import androidx.core.graphics.createBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +26,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -316,7 +316,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    prefs.edit().putBoolean("seen_first_add_warning", true).apply()
+                    prefs.edit { putBoolean("seen_first_add_warning", true) }
                     viewModel.cycleAppGroup(pkg)
                     pendingFirstAdd = null
                 }) { Text("Добавить") }
@@ -342,7 +342,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    prefs.edit().putBoolean("seen_auto_warning", true).apply()
+                    prefs.edit { putBoolean("seen_auto_warning", true)}
                     showAutoWarning = false
                     viewModel.autoSelectRestricted()
                 }) { Text("Заморозить") }
@@ -390,11 +390,11 @@ private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGro
     val iconBitmap = remember(app.packageName) {
         try {
             val drawable = pm.getApplicationIcon(app.packageName)
-            val bmp = Bitmap.createBitmap(
-                drawable.intrinsicWidth.coerceAtLeast(1),
-                drawable.intrinsicHeight.coerceAtLeast(1),
-                Bitmap.Config.ARGB_8888
-            )
+            val bmp =
+                createBitmap(
+                    drawable.intrinsicWidth.coerceAtLeast(1),
+                    drawable.intrinsicHeight.coerceAtLeast(1)
+                )
             val canvas = Canvas(bmp)
             drawable.setBounds(0, 0, canvas.width, canvas.height)
             drawable.draw(canvas)
