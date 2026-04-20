@@ -20,6 +20,7 @@ enum class VpnClientType(
     OLCNG("GitHub", "xyz.zarazaex.olc", brand = "olcng"),
     OLCNG_FDROID("F-Droid", "xyz.zarazaex.olc.fdroid", brand = "olcng"),
     TEAPOD_STREAM("TeapodStream", "com.teapodstream.teapodstream"),
+    TUNGUSKA("Tunguska", "io.acionyx.tunguska"),
     KARING("Karing", "com.nebula.karing"),
     AMNEZIA_VPN("VPN", "org.amnezia.vpn", brand = "Amnezia"),
     AMNEZIA_WG("WG", "org.amnezia.awg", brand = "Amnezia"),
@@ -42,7 +43,8 @@ enum class VpnClientType(
  */
 data class SelectedVpnClient(
     val knownType: VpnClientType? = null,
-    val packageName: String
+    val packageName: String,
+    val automationToken: String? = null,
 ) {
     val displayName: String
         get() = knownType?.fullDisplayName ?: packageName.substringAfterLast('.')
@@ -51,8 +53,11 @@ data class SelectedVpnClient(
         get() = if (knownType != null) VpnClientControls.getControl(knownType).mode else VpnControlMode.MANUAL
 
     companion object {
-        fun fromKnown(type: VpnClientType) = SelectedVpnClient(type, type.packageName)
-        fun fromPackage(pkg: String) = SelectedVpnClient(VpnClientType.fromPackageName(pkg), pkg)
+        fun fromKnown(type: VpnClientType, automationToken: String? = null) =
+            SelectedVpnClient(type, type.packageName, automationToken)
+
+        fun fromPackage(pkg: String, automationToken: String? = null) =
+            SelectedVpnClient(VpnClientType.fromPackageName(pkg), pkg, automationToken)
     }
 }
 
@@ -71,6 +76,8 @@ data class VpnClientControl(
     val startCommand: Array<String>? = null,
     /** Shell command to stop VPN. Only for SEPARATE mode. */
     val stopCommand: Array<String>? = null,
+    val startCommandBuilder: ((SelectedVpnClient) -> Array<String>?)? = null,
+    val stopCommandBuilder: ((SelectedVpnClient) -> Array<String>?)? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -79,6 +86,12 @@ data class VpnClientControl(
     }
 
     override fun hashCode() = clientType.hashCode()
+
+    fun buildStartCommand(client: SelectedVpnClient): Array<String>? =
+        startCommandBuilder?.invoke(client) ?: startCommand
+
+    fun buildStopCommand(client: SelectedVpnClient): Array<String>? =
+        stopCommandBuilder?.invoke(client) ?: stopCommand
 }
 
 object VpnClientControls {
@@ -272,6 +285,32 @@ object VpnClientControls {
             clientType = VpnClientType.TEAPOD_STREAM,
             mode = VpnControlMode.MANUAL,
         ),
+        VpnClientType.TUNGUSKA to VpnClientControl(
+            clientType = VpnClientType.TUNGUSKA,
+            mode = VpnControlMode.SEPARATE,
+            startCommandBuilder = { client ->
+                client.automationToken?.takeIf { it.isNotBlank() }?.let { token ->
+                    arrayOf(
+                        "am", "start", "-W",
+                        "-n", "io.acionyx.tunguska/.app.AutomationRelayActivity",
+                        "-a", "io.acionyx.tunguska.action.AUTOMATION_START",
+                        "--es", "automation_token", token,
+                        "--es", "caller_hint", "anubis",
+                    )
+                }
+            },
+            stopCommandBuilder = { client ->
+                client.automationToken?.takeIf { it.isNotBlank() }?.let { token ->
+                    arrayOf(
+                        "am", "start", "-W",
+                        "-n", "io.acionyx.tunguska/.app.AutomationRelayActivity",
+                        "-a", "io.acionyx.tunguska.action.AUTOMATION_STOP",
+                        "--es", "automation_token", token,
+                        "--es", "caller_hint", "anubis",
+                    )
+                }
+            },
+        ),
         // AmneziaVPN (Qt): no exported broadcast/activity API for start/stop — only QS Tile
         // and MainActivity. Fall back to MANUAL (open app, user taps connect).
         VpnClientType.AMNEZIA_VPN to VpnClientControl(
@@ -314,11 +353,15 @@ object VpnClientControls {
 
     fun getControl(type: VpnClientType): VpnClientControl = controls[type]!!
 
-    fun getControlForPackage(packageName: String): VpnClientControl {
-        val type = VpnClientType.fromPackageName(packageName)
+    fun getControlForClient(client: SelectedVpnClient): VpnClientControl {
+        val type = client.knownType ?: VpnClientType.fromPackageName(client.packageName)
         return if (type != null) controls[type]!! else VpnClientControl(
-            clientType = VpnClientType.V2RAY_NG, // placeholder, unused for MANUAL
+            clientType = VpnClientType.V2RAY_NG,
             mode = VpnControlMode.MANUAL
         )
+    }
+
+    fun getControlForPackage(packageName: String): VpnClientControl {
+        return getControlForClient(SelectedVpnClient.fromPackage(packageName))
     }
 }

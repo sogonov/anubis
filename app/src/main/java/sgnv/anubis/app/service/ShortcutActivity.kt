@@ -7,8 +7,6 @@ import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
 import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.vpn.VpnClientManager
-import sgnv.anubis.app.vpn.SelectedVpnClient
-import sgnv.anubis.app.vpn.VpnClientType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,10 +41,7 @@ class ShortcutActivity : ComponentActivity() {
         val orchestrator = StealthOrchestrator(this, shizukuManager, vpnClientManager, repository)
 
         // Shortcut launches must use the same selected VPN client as the main app UI.
-        val prefs = AppSettings.prefs(this)
-        val pkg = prefs.getString(AppSettings.KEY_VPN_CLIENT_PACKAGE, null)
-            ?: VpnClientType.V2RAY_NG.packageName
-        val client = SelectedVpnClient.fromPackage(pkg)
+        val client = AppSettings.loadSelectedVpnClient(this)
 
         // Ensure UserService is bound (instant if already connected)
         vpnClientManager.startMonitoringVpn()
@@ -72,8 +67,11 @@ class ShortcutActivity : ComponentActivity() {
                     vpnClientManager.detectActiveVpnClient()
                     val detectedPkg = vpnClientManager.activeVpnPackage.value
                     val detected = vpnClientManager.activeVpnClient.value
-                    val stopClient = if (detected != null) SelectedVpnClient.fromKnown(detected)
-                        else detectedPkg?.let { SelectedVpnClient.fromPackage(it) } ?: client
+                    val stopClient = if (detected != null) {
+                        AppSettings.loadSelectedVpnClient(this@ShortcutActivity, detected.packageName)
+                    } else detectedPkg?.let {
+                        AppSettings.loadSelectedVpnClient(this@ShortcutActivity, it)
+                    } ?: client
                     orchestrator.launchLocal(packageName, stopClient, detectedPkg)
                 }
                 AppGroup.VPN_ONLY, AppGroup.LAUNCH_VPN -> {

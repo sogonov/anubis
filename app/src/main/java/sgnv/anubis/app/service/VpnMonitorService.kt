@@ -189,11 +189,24 @@ class VpnMonitorService : Service() {
                         }
                     }
                 }
+                freezeSelectedVpnClientIfNeeded()
             }
         } finally {
             // Always update widget to real VPN state — even if freeze/unfreeze timed out.
             StealthWidgetProvider.updateAllWidgets(applicationContext)
         }
+    }
+
+    private suspend fun freezeSelectedVpnClientIfNeeded() {
+        val packageName = AppSettings.prefs(applicationContext)
+            .getString(AppSettings.KEY_VPN_CLIENT_PACKAGE, null)
+            .orEmpty()
+        if (packageName != "io.acionyx.tunguska") return
+        val shizukuManager = (applicationContext as AnubisApp).shizukuManager
+        if (!shizukuManager.isAvailable() || !shizukuManager.hasPermission()) return
+        shizukuManager.bindUserService()
+        kotlinx.coroutines.delay(200)
+        shizukuManager.freezeApp(packageName)
     }
 
     private fun buildNotification(): Notification {

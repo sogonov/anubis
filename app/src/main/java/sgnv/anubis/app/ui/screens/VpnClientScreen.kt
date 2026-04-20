@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import sgnv.anubis.app.ui.MainViewModel
 import sgnv.anubis.app.vpn.SelectedVpnClient
@@ -259,6 +260,27 @@ fun VpnClientScreen(
                             RadioButton(selected = true, onClick = null)
                         }
                     }
+                }
+            }
+
+            if (selectedClient.packageName == VpnClientType.TUNGUSKA.packageName) {
+                item(key = "tunguska_token") {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = selectedClient.automationToken.orEmpty(),
+                        onValueChange = viewModel::updateSelectedVpnClientAutomationToken,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Automation token") },
+                        placeholder = { Text("Paste the Tunguska automation token") },
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Required for Tunguska start and stop commands.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 

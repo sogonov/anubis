@@ -84,8 +84,13 @@ class StealthOrchestrator(
 
         if (!checkShizuku()) return
 
+        if (shouldFreezeClientInIdle(client.packageName)) {
+            shizukuManager.unfreezeApp(client.packageName)
+            delay(200)
+        }
+
         if (shizukuManager.isAppFrozen(client.packageName)) {
-            fail("VPN-клиент ${client.displayName} заморожен!")
+            fail("VPN client ${client.displayName} is still frozen.")
             return
         }
 
@@ -99,6 +104,11 @@ class StealthOrchestrator(
 
         _progressText.value = "Запускаю VPN..."
         vpnClientManager.startVPN(client)
+
+        if (client.controlMode != VpnControlMode.MANUAL && !waitForVpnOn(10_000)) {
+            fail("VPN client ${client.displayName} did not come up in time.")
+            return
+        }
 
         bumpVersion()
         _progressText.value = null
@@ -317,6 +327,7 @@ class StealthOrchestrator(
                 if (shouldUnfreezeManagedAppsOnVpnToggle()) {
                     unfrozen += unfreezeGroup(AppGroup.LOCAL)
                 }
+                freezeSelectedVpnClientIfNeeded()
                 _state.value = StealthState.DISABLED
             }
         }
@@ -338,13 +349,37 @@ class StealthOrchestrator(
         return false
     }
 
+    private suspend fun waitForVpnOn(timeoutMs: Long): Boolean {
+        val steps = (timeoutMs / 200).toInt()
+        repeat(steps) {
+            delay(200)
+            vpnClientManager.refreshVpnState()
+            if (vpnClientManager.vpnActive.value) return true
+        }
+        return false
+    }
+
     private fun fail(message: String) {
         _progressText.value = null
         _lastError.value = message
         _state.value = StealthState.DISABLED
     }
 
+    private suspend fun freezeSelectedVpnClientIfNeeded() {
+        val packageName = AppSettings.prefs(context)
+            .getString(AppSettings.KEY_VPN_CLIENT_PACKAGE, null)
+            .orEmpty()
+        if (!shouldFreezeClientInIdle(packageName)) return
+        shizukuManager.bindUserService()
+        delay(200)
+        shizukuManager.freezeApp(packageName)
+    }
+
+    private fun shouldFreezeClientInIdle(packageName: String): Boolean =
+        packageName == TUNGUSKA_PACKAGE
+
     private companion object {
+        const val TUNGUSKA_PACKAGE = "io.acionyx.tunguska"
         // Cap on concurrent Shizuku IPC calls during group freeze/unfreeze.
         // On Honor MagicOS parallel disable-user emits a flood of PACKAGE_REMOVED
         // broadcasts that overwhelms the stock launcher's grid repaint — 4 was
@@ -361,3 +396,5 @@ enum class StealthState {
     ENABLED,
     DISABLING
 }
+
+
