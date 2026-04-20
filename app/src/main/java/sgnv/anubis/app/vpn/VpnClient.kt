@@ -72,12 +72,14 @@ enum class VpnControlMode { SEPARATE, TOGGLE, MANUAL }
 data class VpnClientControl(
     val clientType: VpnClientType,
     val mode: VpnControlMode,
+    val freezeInIdle: Boolean = false,
     /** Shell command to start VPN (SEPARATE/TOGGLE). Null for MANUAL. */
     val startCommand: Array<String>? = null,
     /** Shell command to stop VPN. Only for SEPARATE mode. */
     val stopCommand: Array<String>? = null,
     val startCommandBuilder: ((SelectedVpnClient) -> Array<String>?)? = null,
     val stopCommandBuilder: ((SelectedVpnClient) -> Array<String>?)? = null,
+    val startCommandFailureMessageBuilder: ((SelectedVpnClient) -> String?)? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -92,6 +94,9 @@ data class VpnClientControl(
 
     fun buildStopCommand(client: SelectedVpnClient): Array<String>? =
         stopCommandBuilder?.invoke(client) ?: stopCommand
+
+    fun buildStartCommandFailureMessage(client: SelectedVpnClient): String? =
+        startCommandFailureMessageBuilder?.invoke(client)
 }
 
 object VpnClientControls {
@@ -288,6 +293,7 @@ object VpnClientControls {
         VpnClientType.TUNGUSKA to VpnClientControl(
             clientType = VpnClientType.TUNGUSKA,
             mode = VpnControlMode.SEPARATE,
+            freezeInIdle = true,
             startCommandBuilder = { client ->
                 client.automationToken?.takeIf { it.isNotBlank() }?.let { token ->
                     arrayOf(
@@ -297,6 +303,13 @@ object VpnClientControls {
                         "--es", "automation_token", token,
                         "--es", "caller_hint", "anubis",
                     )
+                }
+            },
+            startCommandFailureMessageBuilder = { client ->
+                if (client.automationToken.isNullOrBlank()) {
+                    "Не задан токен автоматизации Tunguska. Укажите его в настройках VPN клиента."
+                } else {
+                    null
                 }
             },
             stopCommandBuilder = { client ->

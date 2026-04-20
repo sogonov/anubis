@@ -6,6 +6,7 @@ import sgnv.anubis.app.data.repository.AppRepository
 import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.shizuku.ShizukuManager
 import sgnv.anubis.app.vpn.SelectedVpnClient
+import sgnv.anubis.app.vpn.VpnClientControls
 import sgnv.anubis.app.vpn.VpnClientManager
 import sgnv.anubis.app.vpn.VpnControlMode
 import kotlinx.coroutines.async
@@ -86,7 +87,6 @@ class StealthOrchestrator(
 
         if (shouldFreezeClientInIdle(client.packageName)) {
             shizukuManager.unfreezeApp(client.packageName)
-            delay(200)
         }
 
         if (shizukuManager.isAppFrozen(client.packageName)) {
@@ -103,7 +103,11 @@ class StealthOrchestrator(
         emitBenchmark(frozen = frozen, unfrozen = 0, startMs = benchStart)
 
         _progressText.value = "Запускаю VPN..."
-        vpnClientManager.startVPN(client)
+        val startError = vpnClientManager.startVPN(client)
+        if (startError != null) {
+            fail(startError)
+            return
+        }
 
         if (client.controlMode != VpnControlMode.MANUAL && !waitForVpnOn(10_000)) {
             fail("VPN client ${client.displayName} did not come up in time.")
@@ -246,7 +250,7 @@ class StealthOrchestrator(
         return waitForVpnOff(2000)
     }
 
-    private fun checkShizuku(): Boolean {
+    private suspend fun checkShizuku(): Boolean {
         if (!shizukuManager.isAvailable()) { fail("Shizuku не запущен."); return false }
         if (!shizukuManager.hasPermission()) { fail("Нет разрешения Shizuku."); return false }
         return true
@@ -359,27 +363,24 @@ class StealthOrchestrator(
         return false
     }
 
-    private fun fail(message: String) {
+    private suspend fun fail(message: String) {
         _progressText.value = null
+        freezeSelectedVpnClientIfNeeded()
         _lastError.value = message
         _state.value = StealthState.DISABLED
     }
 
     private suspend fun freezeSelectedVpnClientIfNeeded() {
-        val packageName = AppSettings.prefs(context)
-            .getString(AppSettings.KEY_VPN_CLIENT_PACKAGE, null)
-            .orEmpty()
-        if (!shouldFreezeClientInIdle(packageName)) return
-        shizukuManager.bindUserService()
-        delay(200)
-        shizukuManager.freezeApp(packageName)
+        val client = AppSettings.loadSelectedVpnClient(context)
+        if (!shouldFreezeClientInIdle(client.packageName)) return
+        if (!shizukuManager.awaitUserService(500)) return
+        shizukuManager.freezeApp(client.packageName)
     }
 
     private fun shouldFreezeClientInIdle(packageName: String): Boolean =
-        packageName == TUNGUSKA_PACKAGE
+        packageName.isNotBlank() && VpnClientControls.getControlForPackage(packageName).freezeInIdle
 
     private companion object {
-        const val TUNGUSKA_PACKAGE = "io.acionyx.tunguska"
         // Cap on concurrent Shizuku IPC calls during group freeze/unfreeze.
         // On Honor MagicOS parallel disable-user emits a flood of PACKAGE_REMOVED
         // broadcasts that overwhelms the stock launcher's grid repaint — 4 was

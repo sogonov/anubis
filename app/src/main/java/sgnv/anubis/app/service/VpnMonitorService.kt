@@ -29,6 +29,7 @@ import sgnv.anubis.app.R
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
 import sgnv.anubis.app.settings.AppSettings
+import sgnv.anubis.app.vpn.VpnClientControls
 import sgnv.anubis.app.ui.MainActivity
 
 /**
@@ -198,15 +199,13 @@ class VpnMonitorService : Service() {
     }
 
     private suspend fun freezeSelectedVpnClientIfNeeded() {
-        val packageName = AppSettings.prefs(applicationContext)
-            .getString(AppSettings.KEY_VPN_CLIENT_PACKAGE, null)
-            .orEmpty()
-        if (packageName != "io.acionyx.tunguska") return
+        val client = AppSettings.loadSelectedVpnClient(applicationContext)
+        val control = VpnClientControls.getControlForClient(client)
+        if (!control.freezeInIdle) return
         val shizukuManager = (applicationContext as AnubisApp).shizukuManager
         if (!shizukuManager.isAvailable() || !shizukuManager.hasPermission()) return
-        shizukuManager.bindUserService()
-        kotlinx.coroutines.delay(200)
-        shizukuManager.freezeApp(packageName)
+        if (!shizukuManager.awaitUserService(500)) return
+        shizukuManager.freezeApp(client.packageName)
     }
 
     private fun buildNotification(): Notification {
