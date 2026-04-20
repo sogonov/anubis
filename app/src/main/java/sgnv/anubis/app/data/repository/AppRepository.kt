@@ -58,8 +58,6 @@ class AppRepository(
         return toSelect.size
     }
 
-    suspend fun countByGroup(group: AppGroup): Int = dao.countByGroup(group)
-
     suspend fun getInstalledApps(): List<InstalledAppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val apps = pm.getInstalledApplications(

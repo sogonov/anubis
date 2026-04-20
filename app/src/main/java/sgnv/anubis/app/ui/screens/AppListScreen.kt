@@ -83,15 +83,17 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val allApps by viewModel.installedApps.collectAsState()
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
-    var showAutoWarning by remember { mutableStateOf(false) }
-    var pendingFirstAdd by remember { mutableStateOf<String?>(null) }
-
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var searchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var sortOrdinal by rememberSaveable { mutableIntStateOf(SortBy.PACKAGE.ordinal) }
+    var sortBy by rememberSaveable { mutableStateOf(SortBy.PACKAGE) }
     var sortMenuOpen by remember { mutableStateOf(false) }
-    val sortBy = SortBy.entries[sortOrdinal]
+
+    var showAutoWarning by remember { mutableStateOf(false) }
+    val dismissAutoWarning: () -> Unit = { showAutoWarning = false }
+
+    var pendingFirstAdd by remember { mutableStateOf<String?>(null) }
+    val dismissFirstAddDialog: () -> Unit = { pendingFirstAdd = null }
 
     val focusRequester = remember { FocusRequester() }
 
@@ -190,7 +192,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                             DropdownMenuItem(
                                 text = { Text(option.label) },
                                 onClick = {
-                                    sortOrdinal = option.ordinal
+                                    sortBy = option
                                     sortMenuOpen = false
                                 }
                             )
@@ -305,7 +307,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
 
     pendingFirstAdd?.let { pkg ->
         AlertDialog(
-            onDismissRequest = { pendingFirstAdd = null },
+            onDismissRequest = dismissFirstAddDialog,
             title = { Text("Добавить в группу?") },
             text = {
                 Text(
@@ -318,18 +320,18 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 TextButton(onClick = {
                     prefs.edit { putBoolean("seen_first_add_warning", true) }
                     viewModel.cycleAppGroup(pkg)
-                    pendingFirstAdd = null
+                    dismissFirstAddDialog()
                 }) { Text("Добавить") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingFirstAdd = null }) { Text("Отмена") }
+                TextButton(onClick = dismissFirstAddDialog) { Text("Отмена") }
             }
         )
     }
 
     if (showAutoWarning) {
         AlertDialog(
-            onDismissRequest = { showAutoWarning = false },
+            onDismissRequest = dismissAutoWarning,
             title = { Text("Перед заморозкой") },
             text = {
                 Text(
@@ -343,12 +345,12 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             confirmButton = {
                 TextButton(onClick = {
                     prefs.edit { putBoolean("seen_auto_warning", true)}
-                    showAutoWarning = false
+                    dismissAutoWarning()
                     viewModel.autoSelectRestricted()
                 }) { Text("Заморозить") }
             },
             dismissButton = {
-                TextButton(onClick = { showAutoWarning = false }) { Text("Отмена") }
+                TextButton(onClick = dismissAutoWarning) { Text("Отмена") }
             }
         )
     }

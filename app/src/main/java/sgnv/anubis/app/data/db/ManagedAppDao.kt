@@ -27,7 +27,4 @@ interface ManagedAppDao {
 
     @Query("DELETE FROM managed_apps WHERE packageName = :packageName")
     suspend fun delete(packageName: String)
-
-    @Query("SELECT COUNT(*) FROM managed_apps WHERE `group` = :group")
-    suspend fun countByGroup(group: AppGroup): Int
 }

@@ -66,8 +66,10 @@ fun AddAppSheet(
     var query by rememberSaveable { mutableStateOf("") }
     var selectedPackages by rememberSaveable { mutableStateOf(setOf<String>()) }
     var isApplying by remember { mutableStateOf(false) }
-    var pendingNeverRestrict by remember { mutableStateOf<List<String>?>(null) }
     val normalizedQuery = query.trim()
+
+    var pendingNeverRestrict by remember { mutableStateOf<List<String>?>(null) }
+    val dismissNeverRestrictDialog: () -> Unit = { pendingNeverRestrict = null }
 
     val applySelection: () -> Unit = {
         val packagesToAssign = selectedPackages.toList()
@@ -246,7 +248,7 @@ fun AddAppSheet(
 
     pendingNeverRestrict?.let { offenders ->
         AlertDialog(
-            onDismissRequest = { pendingNeverRestrict = null },
+            onDismissRequest = dismissNeverRestrictDialog,
             title = { Text("Критичные приложения в выборе") },
             text = {
                 Column {
@@ -263,12 +265,12 @@ fun AddAppSheet(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    pendingNeverRestrict = null
+                    dismissNeverRestrictDialog()
                     applySelection()
                 }) { Text("Всё равно добавить") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingNeverRestrict = null }) {
+                TextButton(onClick = dismissNeverRestrictDialog) {
                     Text("Отмена")
                 }
             }

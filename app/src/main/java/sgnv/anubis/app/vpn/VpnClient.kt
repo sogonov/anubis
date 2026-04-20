@@ -102,15 +102,17 @@ data class VpnClientControl(
 object VpnClientControls {
 
     private val controls = mapOf(
-        // v2rayNG (Play): widget broadcast toggles VPN on/off
-        // Works via Shizuku shell (bypasses exported=false)
+        // v2rayNG (Play): widget broadcast toggles VPN on/off.
+        // `-p` and absolute component name are required on MIUI/HyperOS — OEM `am`
+        // drops broadcasts without explicit package filter (issue #66).
         VpnClientType.V2RAY_NG to VpnClientControl(
             clientType = VpnClientType.V2RAY_NG,
             mode = VpnControlMode.TOGGLE,
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "com.v2ray.ang.action.widget.click",
-                "-n", "com.v2ray.ang/.receiver.WidgetProvider"
+                "-p", "com.v2ray.ang",
+                "-n", "com.v2ray.ang/com.v2ray.ang.receiver.WidgetProvider"
             ),
         ),
 
@@ -122,6 +124,7 @@ object VpnClientControls {
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "com.v2ray.ang.fdroid.action.widget.click",
+                "-p", "com.v2ray.ang.fdroid",
                 "-n", "com.v2ray.ang.fdroid/com.v2ray.ang.receiver.WidgetProvider"
             ),
         ),
@@ -151,14 +154,14 @@ object VpnClientControls {
             ),
         ),
 
-        // husi (SagerNet fork): same pattern as Exclave, but Java package matches applicationId
-        // (fr.husi), so the component uses the relative form.
+        // husi (SagerNet fork): same pattern as Exclave. Component expanded to absolute form
+        // because OEM `am` (MIUI/HyperOS) may not resolve relative "/.X" prefixes (issue #66).
         VpnClientType.HUSI to VpnClientControl(
             clientType = VpnClientType.HUSI,
             mode = VpnControlMode.TOGGLE,
             startCommand = arrayOf(
                 "am", "start",
-                "-n", "fr.husi/.QuickToggleShortcut"
+                "-n", "fr.husi/fr.husi.QuickToggleShortcut"
             ),
         ),
 
@@ -169,12 +172,14 @@ object VpnClientControls {
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "llc.itdev.incy.CONNECT",
-                "-n", "llc.itdev.incy/.receiver.VpnIntentReceiver"
+                "-p", "llc.itdev.incy",
+                "-n", "llc.itdev.incy/llc.itdev.incy.receiver.VpnIntentReceiver"
             ),
             stopCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "llc.itdev.incy.DISCONNECT",
-                "-n", "llc.itdev.incy/.receiver.VpnIntentReceiver"
+                "-p", "llc.itdev.incy",
+                "-n", "llc.itdev.incy/llc.itdev.incy.receiver.VpnIntentReceiver"
             ),
         ),
 
@@ -221,20 +226,21 @@ object VpnClientControls {
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "com.happproxy.action.widget.click",
-                "-n", "com.happproxy/.receiver.WidgetProvider"
+                "-p", "com.happproxy",
+                "-n", "com.happproxy/com.happproxy.receiver.WidgetProvider"
             ),
         ),
 
         // Happ (GitHub): su.happ.proxyutility fork — both applicationId AND
-        // the Java package of the receiver changed, so action mirrors the new id
-        // and the component uses the relative form.
+        // the Java package of the receiver changed.
         VpnClientType.HAPP_GITHUB to VpnClientControl(
             clientType = VpnClientType.HAPP_GITHUB,
             mode = VpnControlMode.TOGGLE,
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "su.happ.proxyutility.action.widget.click",
-                "-n", "su.happ.proxyutility/.receiver.WidgetProvider"
+                "-p", "su.happ.proxyutility",
+                "-n", "su.happ.proxyutility/su.happ.proxyutility.receiver.WidgetProvider"
             ),
         ),
 
@@ -245,7 +251,8 @@ object VpnClientControls {
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "com.v2raytun.android.action.widget.click",
-                "-n", "com.v2raytun.android/.receiver.WidgetProvider1x1"
+                "-p", "com.v2raytun.android",
+                "-n", "com.v2raytun.android/com.v2raytun.android.receiver.WidgetProvider1x1"
             ),
         ),
         // olcng (OpenLibreCommunity fork of v2rayNG): same widget-broadcast pattern, action
@@ -256,7 +263,8 @@ object VpnClientControls {
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "xyz.zarazaex.olc.action.widget.click",
-                "-n", "xyz.zarazaex.olc/.receiver.WidgetProvider"
+                "-p", "xyz.zarazaex.olc",
+                "-n", "xyz.zarazaex.olc/xyz.zarazaex.olc.receiver.WidgetProvider"
             ),
         ),
 
@@ -268,6 +276,7 @@ object VpnClientControls {
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "xyz.zarazaex.olc.fdroid.action.widget.click",
+                "-p", "xyz.zarazaex.olc.fdroid",
                 "-n", "xyz.zarazaex.olc.fdroid/xyz.zarazaex.olc.receiver.WidgetProvider"
             ),
         ),
@@ -280,7 +289,8 @@ object VpnClientControls {
             startCommand = arrayOf(
                 "am", "broadcast",
                 "-a", "dev.hexasoftware.v2box.action.widget.click",
-                "-n", "dev.hexasoftware.v2box/.receiver.WidgetProvider"
+                "-p", "dev.hexasoftware.v2box",
+                "-n", "dev.hexasoftware.v2box/dev.hexasoftware.v2box.receiver.WidgetProvider"
             ),
         ),
 

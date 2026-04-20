@@ -37,9 +37,13 @@ fun RecoveryScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showResetDialog by remember { mutableStateOf(false) }
-    var showScanDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    var showResetDialog by remember { mutableStateOf(false) }
+    val dismissResetDialog: () -> Unit = { showResetDialog = false }
+
+    var showScanDialog by remember { mutableStateOf(false) }
+    val dismissScanDialog: () -> Unit = { showScanDialog = false }
 
     LaunchedEffect(Unit) {
         viewModel.resetCompleted.collect { count ->
@@ -152,7 +156,7 @@ fun RecoveryScreen(
 
     if (showResetDialog) {
         AlertDialog(
-            onDismissRequest = { showResetDialog = false },
+            onDismissRequest = dismissResetDialog,
             title = { Text("Сбросить Anubis?") },
             text = {
                 Text(
@@ -163,20 +167,20 @@ fun RecoveryScreen(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.unfreezeAllAndClear()
-                    showResetDialog = false
+                    dismissResetDialog()
                 }) {
                     Text("Сбросить", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("Отмена") }
+                TextButton(onClick = dismissResetDialog) { Text("Отмена") }
             }
         )
     }
 
     if (showScanDialog) {
         AlertDialog(
-            onDismissRequest = { showScanDialog = false },
+            onDismissRequest = dismissScanDialog,
             title = { Text("Разморозить все отключённые?") },
             text = {
                 Text(
@@ -188,13 +192,13 @@ fun RecoveryScreen(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.unfreezeAllUserDisabled()
-                    showScanDialog = false
+                    dismissScanDialog()
                 }) {
                     Text("Разморозить всё", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showScanDialog = false }) { Text("Отмена") }
+                TextButton(onClick = dismissScanDialog) { Text("Отмена") }
             }
         )
     }

@@ -44,16 +44,6 @@ class VpnClientManager(
         }
     }
 
-    /** Check if the app is installed AND enabled (not frozen/disabled) */
-    fun isEnabled(type: VpnClientType): Boolean {
-        return try {
-            val info = context.packageManager.getApplicationInfo(type.packageName, 0)
-            info.enabled
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     /**
      * Start VPN via Shizuku shell command.
      * For TOGGLE: sends toggle only if VPN is currently off.
