@@ -56,31 +56,32 @@ class MainActivity : ComponentActivity() {
                 viewModelRef = viewModel
                 var selectedTab by rememberSaveable { mutableIntStateOf(0) }
                 var showRecovery by rememberSaveable { mutableStateOf(false) }
+                val dismissRecovery: () -> Unit = { showRecovery = false }
 
                 Scaffold(
                     bottomBar = {
                         NavigationBar {
                             NavigationBarItem(
                                 selected = selectedTab == 0,
-                                onClick = { selectedTab = 0 },
+                                onClick = { selectedTab = 0; dismissRecovery() },
                                 icon = { Icon(Icons.Default.Home, contentDescription = null) },
                                 label = { Text("Главная") }
                             )
                             NavigationBarItem(
                                 selected = selectedTab == 1,
-                                onClick = { selectedTab = 1 },
+                                onClick = { selectedTab = 1; dismissRecovery() },
                                 icon = { Icon(Icons.Default.List, contentDescription = null) },
                                 label = { Text("Приложения") }
                             )
                             NavigationBarItem(
                                 selected = selectedTab == 2,
-                                onClick = { selectedTab = 2 },
+                                onClick = { selectedTab = 2; dismissRecovery() },
                                 icon = { Icon(Icons.Default.Lock, contentDescription = null) },
                                 label = { Text("VPN") }
                             )
                             NavigationBarItem(
                                 selected = selectedTab == 3,
-                                onClick = { selectedTab = 3 },
+                                onClick = { selectedTab = 3; dismissRecovery() },
                                 icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                                 label = { Text("Настройки") }
                             )
@@ -90,7 +91,7 @@ class MainActivity : ComponentActivity() {
                     if (showRecovery) {
                         RecoveryScreen(
                             viewModel = viewModel,
-                            onBack = { showRecovery = false },
+                            onBack = dismissRecovery,
                             modifier = Modifier.padding(padding)
                         )
                     } else when (selectedTab) {
