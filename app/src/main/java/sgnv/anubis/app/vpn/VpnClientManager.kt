@@ -10,9 +10,11 @@ import android.util.Log
 import sgnv.anubis.app.shizuku.ShizukuManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 class VpnClientManager(
     private val context: Context,
@@ -127,8 +129,21 @@ class VpnClientManager(
         // For custom clients: caller handles via force-stop
     }
 
-    fun launchApp(packageName: String) {
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+    suspend fun launchApp(packageName: String) {
+        // After unfreezeApp the binder call returns immediately, but PackageManager's
+        // launcher-intent cache lags briefly — getLaunchIntentForPackage returns null
+        // for ~100–300 ms while PM rebuilds. Without polling, the first tap on a
+        // shortcut/URL silently no-ops; the second tap works because the app is
+        // already in the cache. Already-launchable apps return on the first
+        // iteration (no delay), so this costs nothing on the happy path.
+        val launchIntent = withTimeoutOrNull(LAUNCH_INTENT_POLL_TIMEOUT_MS) {
+            var intent = context.packageManager.getLaunchIntentForPackage(packageName)
+            while (intent == null) {
+                delay(50)
+                intent = context.packageManager.getLaunchIntentForPackage(packageName)
+            }
+            intent
+        }
         if (launchIntent != null) {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(launchIntent)
@@ -297,5 +312,13 @@ class VpnClientManager(
 
     companion object {
         private const val TAG = "VpnClientManager"
+
+        /**
+         * Ceiling for the getLaunchIntentForPackage poll after unfreezeApp. Typical
+         * PM settle time is 100–300 ms; 1500 ms covers slow OEMs and also bounds the
+         * wait for genuinely-uninstalled packages (rare — caller usually knows the
+         * package is managed and installed).
+         */
+        private const val LAUNCH_INTENT_POLL_TIMEOUT_MS = 1_500L
     }
 }
