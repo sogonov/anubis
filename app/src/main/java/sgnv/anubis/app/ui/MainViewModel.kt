@@ -140,7 +140,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (active) {
                         // VPN turned ON (possibly outside Anubis) — freeze LOCAL apps
                         orchestrator.freezeOnly()
-                        VpnMonitorService.start(getApplication())
                     } else {
                         // VPN turned OFF — freeze VPN_ONLY apps
                         orchestrator.freezeVpnOnly()
@@ -163,9 +162,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             if (stealthState.value == StealthState.DISABLED) {
                 orchestrator.enable(_selectedVpnClient.value)
-                if (orchestrator.state.value == StealthState.ENABLED) {
-                    VpnMonitorService.start(getApplication())
-                }
             } else if (stealthState.value == StealthState.ENABLED) {
                 val detectedPkg = vpnClientManager.activeVpnPackage.value
                 val detectedClient = vpnClientManager.activeVpnClient.value
@@ -176,9 +172,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                     ?: _selectedVpnClient.value
                 orchestrator.disable(clientToStop, detectedPkg)
-                if (orchestrator.state.value == StealthState.DISABLED) {
-                    VpnMonitorService.stop(getApplication())
-                }
             }
         }
     }
@@ -186,9 +179,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun launchWithVpn(packageName: String) {
         viewModelScope.launch {
             orchestrator.launchWithVpn(packageName, _selectedVpnClient.value)
-            if (orchestrator.state.value == StealthState.ENABLED) {
-                VpnMonitorService.start(getApplication())
-            }
         }
     }
 
@@ -203,9 +193,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
                 ?: _selectedVpnClient.value
             orchestrator.launchLocal(packageName, clientToStop, detectedPkg)
-            if (orchestrator.state.value == StealthState.DISABLED) {
-                VpnMonitorService.stop(getApplication())
-            }
         }
     }
 
@@ -555,9 +542,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 && shizukuManager.status.value == ShizukuStatus.READY
             ) {
                 orchestrator.freezeOnly()
-                if (orchestrator.state.value == StealthState.ENABLED) {
-                    VpnMonitorService.start(getApplication())
-                }
             }
         }
     }

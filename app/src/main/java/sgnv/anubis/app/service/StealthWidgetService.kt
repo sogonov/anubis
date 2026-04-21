@@ -68,7 +68,6 @@ class StealthWidgetService : Service() {
                 // permanently stuck in an intermediate state if something hangs.
                 withTimeoutOrNull(TOTAL_TOGGLE_TIMEOUT_MS) {
                     if (willBeActive) {
-                        VpnMonitorService.start(this@StealthWidgetService)
                         orchestrator.enable(client)
                         // join() ensures any in-flight updateAllWidgets() inside
                         // progressJob completes before we overwrite with final state.
@@ -87,7 +86,6 @@ class StealthWidgetService : Service() {
                         vpnClientManager.detectActiveVpnClient()
                         val detectedPkg = vpnClientManager.activeVpnPackage.value
                         orchestrator.disable(client, detectedPkg)
-                        VpnMonitorService.stop(this@StealthWidgetService)
                         progressJob.cancel()
                         progressJob.join()
                     }

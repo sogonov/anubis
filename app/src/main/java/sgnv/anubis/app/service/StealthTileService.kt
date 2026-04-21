@@ -43,7 +43,6 @@ class StealthTileService : TileService() {
 
                 withTimeoutOrNull(TOTAL_TOGGLE_TIMEOUT_MS) {
                     if (willBeActive) {
-                        VpnMonitorService.start(this@StealthTileService)
                         orchestrator.enable(client)
                         if (orchestrator.lastError.value == null) {
                             withTimeoutOrNull(VPN_CONNECT_TIMEOUT_MS) {
@@ -55,7 +54,6 @@ class StealthTileService : TileService() {
                         vpnClientManager.detectActiveVpnClient()
                         val detectedPkg = vpnClientManager.activeVpnPackage.value
                         orchestrator.disable(client, detectedPkg)
-                        VpnMonitorService.stop(this@StealthTileService)
                     }
                 }
             } finally {
