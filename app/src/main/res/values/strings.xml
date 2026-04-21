@@ -2,4 +2,9 @@
 <resources>
     <string name="app_name">Anubis</string>
     <string name="tile_label">Anubis</string>
+
+    <string name="stealth_status_on">Stealth ON</string>
+    <string name="stealth_status_off">Stealth OFF</string>
+    <string name="vpn_monitor_notification_title">Anubis: мониторинг активен</string>
+    <string name="vpn_monitor_notification_text">Автозаморозка при изменении VPN</string>
 </resources>
