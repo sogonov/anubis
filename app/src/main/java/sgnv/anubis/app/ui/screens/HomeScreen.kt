@@ -1,9 +1,7 @@
 package sgnv.anubis.app.ui.screens
 
 import android.content.Intent
-import android.graphics.Canvas
 import androidx.core.net.toUri
-import androidx.core.graphics.createBitmap
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -53,7 +51,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,6 +62,7 @@ import sgnv.anubis.app.service.StealthState
 import sgnv.anubis.app.shizuku.SHIZUKU_PACKAGE
 import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.ui.MainViewModel
+import sgnv.anubis.app.ui.util.renderToImageBitmap
 
 private val grayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
 
@@ -464,16 +462,9 @@ fun HomeScreen(
             catch (e: Exception) { pkg }
         }
         val iconBitmap = remember(pkg) {
-            try {
-                val drawable = pm.getApplicationIcon(pkg)
-                val bmp = createBitmap(
-                    drawable.intrinsicWidth.coerceAtLeast(1),
-                    drawable.intrinsicHeight.coerceAtLeast(1))
-                val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, canvas.width, canvas.height)
-                drawable.draw(canvas)
-                bmp.asImageBitmap()
-            } catch (e: Exception) { null }
+            runCatching {
+                pm.getApplicationIcon(pkg).renderToImageBitmap()
+            }.getOrNull()
         }
 
         ModalBottomSheet(
@@ -621,17 +612,9 @@ private fun AppIconItem(
     }
 
     val iconBitmap = remember(packageName) {
-        try {
-            val drawable = pm.getApplicationIcon(packageName)
-            val bmp = createBitmap(
-                drawable.intrinsicWidth.coerceAtLeast(1),
-                drawable.intrinsicHeight.coerceAtLeast(1)
-            )
-            val canvas = Canvas(bmp)
-            drawable.setBounds(0, 0, canvas.width, canvas.height)
-            drawable.draw(canvas)
-            bmp.asImageBitmap()
-        } catch (e: Exception) { null }
+        runCatching {
+            pm.getApplicationIcon(packageName).renderToImageBitmap()
+        }.getOrNull()
     }
 
     Column(

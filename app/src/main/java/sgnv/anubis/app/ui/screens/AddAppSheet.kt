@@ -1,6 +1,5 @@
 package sgnv.anubis.app.ui.screens
 
-import android.graphics.Canvas
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -36,7 +35,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,7 +42,7 @@ import kotlinx.coroutines.launch
 import sgnv.anubis.app.data.NeverRestrictApps
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.ui.MainViewModel
-import androidx.core.graphics.createBitmap
+import sgnv.anubis.app.ui.util.renderToImageBitmap
 
 /**
  * Bottom sheet for inline add-to-group flow on the Home screen.
@@ -147,17 +145,9 @@ fun AddAppSheet(
                 items(filtered, key = { it.packageName }) { app ->
                     val isSelected = app.packageName in selectedPackages
                     val iconBitmap = remember(app.packageName) {
-                        try {
-                            val drawable = pm.getApplicationIcon(app.packageName)
-                            val bmp = createBitmap(
-                                drawable.intrinsicWidth.coerceAtLeast(1),
-                                drawable.intrinsicHeight.coerceAtLeast(1)
-                            )
-                            val canvas = Canvas(bmp)
-                            drawable.setBounds(0, 0, canvas.width, canvas.height)
-                            drawable.draw(canvas)
-                            bmp.asImageBitmap()
-                        } catch (e: Exception) { null }
+                        runCatching {
+                            pm.getApplicationIcon(app.packageName).renderToImageBitmap()
+                        }.getOrNull()
                     }
                     Row(
                         modifier = Modifier
