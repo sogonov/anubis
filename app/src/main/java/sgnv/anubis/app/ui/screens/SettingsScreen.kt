@@ -251,10 +251,17 @@ fun SettingsScreen(
                 }
 
                 val context = LocalContext.current
-                TextButton(onClick = {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/sogonov/anubis".toUri()))
-                }) {
-                    Text("GitHub", style = MaterialTheme.typography.labelMedium)
+                Column {
+                    TextButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/sogonov/anubis".toUri()))
+                    }) {
+                        Text("GitHub", style = MaterialTheme.typography.labelMedium)
+                    }
+                    TextButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://t.me/anubis_app".toUri()))
+                    }) {
+                        Text("Telegram", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         }
