@@ -2,4 +2,8 @@
 <resources>
     <string name="app_name">Anubis</string>
     <string name="tile_label">Anubis</string>
+
+    <string name="startup_status_scanning_progress">Сканирование приложений: %1$d / %2$d</string>
+    <string name="startup_status_preparing_launch">Подготовка к запуску…</string>
+    <string name="startup_version_format">Версия %1$s</string>
 </resources>

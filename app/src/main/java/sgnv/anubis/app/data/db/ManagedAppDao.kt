@@ -10,6 +10,9 @@ import sgnv.anubis.app.data.model.ManagedApp
 @Dao
 interface ManagedAppDao {
 
+    @Query("SELECT * FROM managed_apps")
+    suspend fun getAll(): List<ManagedApp>
+
     @Query("SELECT * FROM managed_apps WHERE `group` = :group")
     suspend fun getByGroup(group: AppGroup): List<ManagedApp>
 
