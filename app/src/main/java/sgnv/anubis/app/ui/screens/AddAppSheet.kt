@@ -38,11 +38,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import sgnv.anubis.app.data.NeverRestrictApps
+import sgnv.anubis.app.policy.FreezeSafetyPolicy
 import sgnv.anubis.app.data.model.AppGroup
+import sgnv.anubis.app.R
 import sgnv.anubis.app.ui.MainViewModel
 import androidx.core.graphics.createBitmap
 
@@ -76,11 +78,7 @@ fun AddAppSheet(
         scope.launch {
             isApplying = true
             viewModel.setAppsGroup(packagesToAssign, targetGroup)
-            Toast.makeText(
-                context,
-                "Добавлено ${packagesToAssign.size} приложений",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(context, context.getString(R.string.add_app_sheet_added_count, packagesToAssign.size), Toast.LENGTH_SHORT).show()
             onDismiss()
         }
     }
@@ -229,7 +227,7 @@ fun AddAppSheet(
                 }
                 Button(
                     onClick = {
-                        val risky = selectedPackages.filter { NeverRestrictApps.isNeverRestrict(it) }
+                        val risky = FreezeSafetyPolicy.findProtected(selectedPackages)
                         if (risky.isNotEmpty()) {
                             pendingNeverRestrict = risky
                         } else {
@@ -249,12 +247,11 @@ fun AddAppSheet(
     pendingNeverRestrict?.let { offenders ->
         AlertDialog(
             onDismissRequest = dismissNeverRestrictDialog,
-            title = { Text("Критичные приложения в выборе") },
+            title = { Text(stringResource(R.string.add_app_sheet_critical_title)) },
             text = {
                 Column {
                     Text(
-                        "Эти приложения отвечают за ввод текста, звонки или 2FA. " +
-                            "Их заморозка может заблокировать устройство:",
+                        stringResource(R.string.add_app_sheet_critical_message),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(Modifier.height(8.dp))
@@ -264,14 +261,38 @@ fun AddAppSheet(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    dismissNeverRestrictDialog()
-                    applySelection()
-                }) { Text("Всё равно добавить") }
-            },
-            dismissButton = {
-                TextButton(onClick = dismissNeverRestrictDialog) {
-                    Text("Отмена")
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = {
+                        val safePackages = selectedPackages.filterNot { it in offenders }
+                        dismissNeverRestrictDialog()
+                        if (safePackages.isEmpty()) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.add_app_sheet_no_safe_apps),
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@TextButton
+                        }
+                        scope.launch {
+                            isApplying = true
+                            viewModel.setAppsGroup(safePackages, targetGroup)
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.add_app_sheet_added_count, safePackages.size),
+                                Toast.LENGTH_LONG
+                            ).show()
+                            onDismiss()
+                        }
+                    }) { Text(stringResource(R.string.add_app_sheet_add_safe)) }
+
+                    TextButton(onClick = {
+                        dismissNeverRestrictDialog()
+                        applySelection()
+                    }) { Text(stringResource(R.string.add_app_sheet_add_anyway)) }
+
+                    TextButton(onClick = dismissNeverRestrictDialog) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
                 }
             }
         )

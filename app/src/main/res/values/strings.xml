@@ -3,6 +3,14 @@
     <string name="app_name">Anubis</string>
     <string name="tile_label">Anubis</string>
 
+    <string name="add_app_sheet_critical_title">Критичные приложения в выборе</string>
+    <string name="add_app_sheet_critical_message">Эти приложения отвечают за ввод текста, звонки, 2FA или являются VPN-клиентами. Их заморозка может заблокировать устройство:</string>
+    <string name="add_app_sheet_added_count">Добавлено %1$d приложений</string>
+    <string name="add_app_sheet_no_safe_apps">Нет безопасных приложений для добавления</string>
+    <string name="add_app_sheet_add_safe">Добавить только безопасные</string>
+    <string name="add_app_sheet_add_anyway">Добавить все</string>
+
+    <string name="common_cancel">Отмена</string>
     <string name="home_status_enabled">ЗАЩИТА АКТИВНА</string>
     <string name="home_status_enabling">ВКЛЮЧЕНИЕ...</string>
     <string name="home_status_disabling">ОТКЛЮЧЕНИЕ...</string>
