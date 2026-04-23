@@ -1,4 +1,4 @@
-﻿package sgnv.anubis.app.ui
+package sgnv.anubis.app.ui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity

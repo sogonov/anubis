@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Anubis</string>
     <string name="tile_label">Anubis</string>
@@ -6,7 +6,7 @@
     <string name="startup_status_scanning_progress">Сканирование приложений: %1$d / %2$d</string>
     <string name="startup_status_preparing_launch">Подготовка к запуску…</string>
     <string name="startup_version_format">Версия %1$s</string>
-  
+
     <string name="stealth_status_on">Stealth ON</string>
     <string name="stealth_status_off">Stealth OFF</string>
     <string name="vpn_monitor_notification_title">Anubis: мониторинг активен</string>

@@ -37,7 +37,7 @@ class StealthWidgetProvider : AppWidgetProvider() {
             updateAllWidgets(
                 context,
                 if (vpnActive) context.getString(R.string.stealth_status_on) else context.getString(R.string.stealth_status_off),
-                if (vpnActive) COLOR_ACTIVE else COLOR_INACTIVE
+                if (vpnActive) activeColor(context) else inactiveColor(context)
             )
         }
 
@@ -53,7 +53,7 @@ class StealthWidgetProvider : AppWidgetProvider() {
             manager.updateAppWidget(widgetId, buildViews(
                 context,
                 if (vpnActive) context.getString(R.string.stealth_status_on) else context.getString(R.string.stealth_status_off),
-                if (vpnActive) COLOR_ACTIVE else COLOR_INACTIVE
+                if (vpnActive) activeColor(context) else inactiveColor(context)
             ))
         }
 
