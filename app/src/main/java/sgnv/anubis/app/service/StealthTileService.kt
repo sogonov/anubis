@@ -1,10 +1,9 @@
 package sgnv.anubis.app.service
 
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import sgnv.anubis.app.AnubisApp
+import sgnv.anubis.app.R
 import sgnv.anubis.app.settings.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,20 +65,13 @@ class StealthTileService : TileService() {
         val tile = qsTile ?: return
         val vpnActive = isActive ?: isVpnActive()
         tile.state = if (vpnActive) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.label = if (vpnActive) "Stealth ON" else "Stealth OFF"
+        tile.label = if (vpnActive) getString(R.string.stealth_status_on) else getString(R.string.stealth_status_off)
         tile.updateTile()
     }
 
     private fun isVpnActive(): Boolean {
-        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        return try {
-            cm.allNetworks.any { network ->
-                cm.getNetworkCapabilities(network)
-                    ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-            }
-        } catch (e: Exception) {
-            false
-        }
+        val app = application as AnubisApp
+        return app.vpnClientManager.vpnActive.value
     }
 
     override fun onDestroy() {

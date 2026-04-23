@@ -1,5 +1,26 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Anubis</string>
     <string name="tile_label">Anubis</string>
+
+    <string name="stealth_status_on">Stealth ON</string>
+    <string name="stealth_status_off">Stealth OFF</string>
+    <string name="vpn_monitor_notification_title">Anubis: мониторинг активен</string>
+    <string name="vpn_monitor_notification_text">Автозаморозка при изменении VPN</string>
+    <string name="add_app_sheet_critical_title">Критичные приложения в выборе</string>
+    <string name="add_app_sheet_critical_message">Эти приложения отвечают за ввод текста, звонки, 2FA или являются VPN-клиентами. Их заморозка может заблокировать устройство:</string>
+    <string name="add_app_sheet_added_count">Добавлено %1$d приложений</string>
+    <string name="add_app_sheet_no_safe_apps">Нет безопасных приложений для добавления</string>
+    <string name="add_app_sheet_add_safe">Добавить только безопасные</string>
+    <string name="add_app_sheet_add_anyway">Добавить все</string>
+
+    <string name="common_cancel">Отмена</string>
+    <string name="home_status_enabled">ЗАЩИТА АКТИВНА</string>
+    <string name="home_status_enabling">ВКЛЮЧЕНИЕ...</string>
+    <string name="home_status_disabling">ОТКЛЮЧЕНИЕ...</string>
+    <string name="home_status_unfreezing">РАЗМОРОЗКА...</string>
+    <string name="home_status_disabled">ЗАЩИТА ОТКЛЮЧЕНА</string>
+
+    <string name="settings_launcher_safe_mode_title">Безопасный режим лаунчера</string>
+    <string name="settings_launcher_safe_mode_description">Уменьшает вероятность дубликатов ярлыков: массовая разморозка выполняется по одному приложению с короткой паузой.</string>
 </resources>

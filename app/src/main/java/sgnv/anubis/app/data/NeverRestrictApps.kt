@@ -5,11 +5,9 @@ package sgnv.anubis.app.data
  * phone calls, or 2FA flows — which typically requires a factory reset or ADB
  * recovery for non-technical users.
  *
- * Enforced in two places:
- *  - [sgnv.anubis.app.data.repository.AppRepository.autoSelectRestricted] filters
- *    these out so Auto-Select never proposes them.
- *  - [sgnv.anubis.app.ui.screens.AddAppSheet] shows a confirmation dialog before
- *    assigning any of these to a group via manual multi-select.
+ * This list is one input to [sgnv.anubis.app.policy.FreezeSafetyPolicy].
+ * The policy layer also adds VPN client packages and is the single entry point
+ * used by UI warnings and auto-selection filters.
  *
  * List curated from incidents in the issue tracker and Habr feedback
  * (Yandex.Клавиатура auto-selected by the `ru.yandex.` prefix heuristic in
@@ -18,6 +16,9 @@ package sgnv.anubis.app.data
 object NeverRestrictApps {
 
     val packageNames = setOf(
+        // Anubis itself - never allow self-freeze
+        "sgnv.anubis.app",
+
         // Keyboards — without them text input stops working
         "com.google.android.inputmethod.latin",       // Gboard
         "com.samsung.android.honeyboard",             // Samsung Keyboard
