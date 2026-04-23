@@ -4,11 +4,11 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import sgnv.anubis.app.data.DefaultRestrictedApps
-import sgnv.anubis.app.data.NeverRestrictApps
 import sgnv.anubis.app.data.db.ManagedAppDao
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.model.InstalledAppInfo
 import sgnv.anubis.app.data.model.ManagedApp
+import sgnv.anubis.app.policy.FreezeSafetyPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -52,7 +52,7 @@ class AppRepository(
         val installed = getInstalledPackageNames()
         val toSelect = installed
             .filter { DefaultRestrictedApps.isKnownRestricted(it) }
-            .filter { !NeverRestrictApps.isNeverRestrict(it) }
+            .filter { !FreezeSafetyPolicy.isProtected(it) }
             .map { ManagedApp(it, AppGroup.LOCAL) }
         dao.insertAll(toSelect)
         return toSelect.size

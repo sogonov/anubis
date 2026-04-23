@@ -62,7 +62,10 @@ class StealthOrchestrator(
         // If VPN is on, we're in stealth mode (spies should be frozen)
         // If VPN is off, stealth is disabled
         val newState = if (vpnActive) StealthState.ENABLED else StealthState.DISABLED
-        if (_state.value != StealthState.ENABLING && _state.value != StealthState.DISABLING) {
+        if (_state.value != StealthState.ENABLING
+            && _state.value != StealthState.DISABLING
+            && _state.value != StealthState.UNFREEZING
+        ) {
             _state.value = newState
         }
     }
@@ -200,6 +203,7 @@ class StealthOrchestrator(
         }
 
         _progressText.value = "Размораживаю..."
+        _state.value = StealthState.UNFREEZING
         // After confirmed VPN shutdown, align managed groups with the new network state.
         applyManagedStateForVpn(active = false)
         _progressText.value = null
@@ -207,7 +211,10 @@ class StealthOrchestrator(
 
     private fun alignStateWithVpn() {
         val current = _state.value
-        if (current == StealthState.ENABLING || current == StealthState.DISABLING) {
+        if (current == StealthState.ENABLING
+            || current == StealthState.DISABLING
+            || current == StealthState.UNFREEZING
+        ) {
             _state.value = if (vpnClientManager.vpnActive.value) {
                 StealthState.ENABLED
             } else {
@@ -345,7 +352,22 @@ class StealthOrchestrator(
     }
 
     private suspend fun unfreezeGroup(group: AppGroup): Int {
-        val packages = repository.getPackagesByGroup(group)
+        val packages = repository.getPackagesByGroup(group).toList()
+        if (AppSettings.shouldUseLauncherSafeMode(context)) {
+            var transitioned = 0
+            packages.forEachIndexed { index, pkg ->
+                if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
+                    shizukuManager.unfreezeApp(pkg)
+                    transitioned++
+                }
+                // On MIUI/HyperOS and some OEM launchers, bursts of package-enabled events
+                // are handled as repeated "new app" inserts and produce duplicate icons.
+                if (index < packages.lastIndex) {
+                    delay(LAUNCHER_SAFE_UNFREEZE_DELAY_MS)
+                }
+            }
+            return transitioned
+        }
         val sem = Semaphore(FREEZE_CONCURRENCY)
         val counter = AtomicInteger(0)
         coroutineScope {
@@ -465,6 +487,9 @@ class StealthOrchestrator(
         // force-stop. If we hit this ceiling something is genuinely broken (Shizuku
         // wedged, VPN client unresponsive) — no point waiting longer.
         const val TOTAL_OP_TIMEOUT_MS = 45_000L
+
+        // Launcher-safe profile: serialize mass-unfreeze to avoid duplicate launcher icons.
+        const val LAUNCHER_SAFE_UNFREEZE_DELAY_MS = 180L
     }
 }
 
@@ -472,7 +497,8 @@ enum class StealthState {
     DISABLED,
     ENABLING,
     ENABLED,
-    DISABLING
+    DISABLING,
+    UNFREEZING
 }
 
 

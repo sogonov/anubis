@@ -59,7 +59,20 @@ Extracts the VPN network owner UID from `dumpsys connectivity` by matching `type
 | Happ | `com.happproxy` | Auto (toggle) | Widget broadcast |
 | v2rayTun | `com.v2raytun.android` | Auto (toggle) | Widget broadcast |
 | V2Box | `dev.hexasoftware.v2box` | Auto (toggle) | Widget broadcast |
+| [Tunguska](https://github.com/Acionyx/tunguska) | `io.acionyx.tunguska` | Full (start/stop) | Token-gated exported activity |
 | **Any app** | — | Manual | Select in Settings → "Other client" |
+
+### Tunguska
+
+Tunguska integrates differently from widget-toggle clients. Instead of a single broadcast toggle, it exposes explicit `AUTOMATION_START` and `AUTOMATION_STOP` actions through a dedicated exported activity, guarded by a per-client automation token. Anubis stores that token in encrypted preferences and uses it for separate start and stop orchestration.
+
+Quick setup:
+
+1. Install [Tunguska](https://github.com/Acionyx/tunguska) and import a working profile.
+2. Start Tunguska once manually and grant Android VPN permission.
+3. In Tunguska, open `Anubis Integration`, enable automation, and copy the generated token.
+4. In Anubis, select `Tunguska` as the VPN client and paste the token into the VPN client settings.
+5. Use Anubis normally: it can unfreeze Tunguska, send explicit start/stop commands, and freeze it again while idle.
 
 ### Discovering VPN Client APIs
 
