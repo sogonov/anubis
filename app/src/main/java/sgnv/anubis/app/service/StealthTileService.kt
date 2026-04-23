@@ -5,6 +5,7 @@ import android.service.quicksettings.TileService
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.R
 import sgnv.anubis.app.settings.AppSettings
+import sgnv.anubis.app.shizuku.ShizukuStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,6 +39,9 @@ class StealthTileService : TileService() {
 
         scope.launch {
             try {
+                if (shizukuManager.status.value != ShizukuStatus.READY) {
+                    return@launch
+                }
                 shizukuManager.awaitUserService()
 
                 withTimeoutOrNull(TOTAL_TOGGLE_TIMEOUT_MS) {

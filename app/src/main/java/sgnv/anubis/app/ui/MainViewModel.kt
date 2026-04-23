@@ -14,6 +14,7 @@ import sgnv.anubis.app.service.StealthVpnService
 import sgnv.anubis.app.service.VpnMonitorService
 import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.shizuku.ShizukuStatus
+import sgnv.anubis.app.shizuku.shizukuUnavailableMessageRes
 import sgnv.anubis.app.update.UpdateChecker
 import sgnv.anubis.app.update.UpdateInfo
 import sgnv.anubis.app.vpn.SelectedVpnClient
@@ -119,6 +120,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _resetCompleted = MutableSharedFlow<Int>()
     val resetCompleted: SharedFlow<Int> = _resetCompleted
+    private val _toastMessages = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val toastMessages: SharedFlow<String> = _toastMessages
     private val _startupLoading = MutableStateFlow(true)
     val startupLoading: StateFlow<Boolean> = _startupLoading
     private val _message = MutableStateFlow("")
@@ -171,6 +174,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleStealth() {
+        if (!ensureShizukuReadyForAction()) return
         viewModelScope.launch {
             if (stealthState.value == StealthState.DISABLED) {
                 orchestrator.enable(_selectedVpnClient.value)
@@ -189,12 +193,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun launchWithVpn(packageName: String) {
+        if (!ensureShizukuReadyForAction()) return
         viewModelScope.launch {
             orchestrator.launchWithVpn(packageName, _selectedVpnClient.value)
         }
     }
 
     fun launchLocal(packageName: String) {
+        if (!ensureShizukuReadyForAction()) return
         viewModelScope.launch {
             val detectedPkg = vpnClientManager.activeVpnPackage.value
             val detectedClient = vpnClientManager.activeVpnClient.value
@@ -209,6 +215,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleAppFrozen(packageName: String) {
+        if (!ensureShizukuReadyForAction()) return
         viewModelScope.launch {
             orchestrator.toggleAppFrozen(packageName)
             loadGroupedApps()
@@ -353,6 +360,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun unfreezeAllAndClear() {
+        if (!ensureShizukuReadyForAction()) return
         viewModelScope.launch {
             val allManaged = repository.getAllManagedPackages()
             var unfrozenCount = 0
@@ -373,6 +381,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Emergency: scan PM for all user-disabled apps and unfreeze them.
      *  Covers the case when Anubis was reinstalled and DB is empty but apps are still frozen. */
     fun unfreezeAllUserDisabled() {
+        if (!ensureShizukuReadyForAction()) return
         viewModelScope.launch {
             val pm = getApplication<Application>().packageManager
             val disabled = withContext(Dispatchers.IO) {
@@ -662,6 +671,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         // VpnClientManager is a process-wide singleton in AnubisApp — don't stop it here.
         super.onCleared()
+    }
+
+    private fun ensureShizukuReadyForAction(): Boolean {
+        val status = shizukuManager.status.value
+        val messageRes = shizukuUnavailableMessageRes(status) ?: return true
+        _toastMessages.tryEmit(getApplication<Application>().getString(messageRes))
+        return false
     }
 }
 
