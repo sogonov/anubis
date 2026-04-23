@@ -22,9 +22,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import sgnv.anubis.app.R
 import sgnv.anubis.app.shizuku.SHIZUKU_PACKAGE
 import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.ui.MainViewModel
@@ -37,6 +39,7 @@ fun SettingsScreen(
 ) {
     val shizukuStatus by viewModel.shizukuStatus.collectAsState()
     val unfreezeManagedAppsOnVpnToggle by viewModel.unfreezeManagedAppsOnVpnToggle.collectAsState()
+    val launcherSafeMode by viewModel.launcherSafeMode.collectAsState()
 
     Column(
         modifier = modifier
@@ -110,6 +113,32 @@ fun SettingsScreen(
                 androidx.compose.material3.Switch(
                     checked = unfreezeManagedAppsOnVpnToggle,
                     onCheckedChange = { viewModel.setUnfreezeManagedAppsOnVpnToggle(it) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_launcher_safe_mode_title),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        stringResource(R.string.settings_launcher_safe_mode_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                androidx.compose.material3.Switch(
+                    checked = launcherSafeMode,
+                    onCheckedChange = { viewModel.setLauncherSafeMode(it) }
                 )
             }
         }

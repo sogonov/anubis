@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_icon_active">#4CAF50</color>
+    <color name="widget_icon_inactive">#9E9E9E</color>
+    <color name="widget_icon_working">#FFAA00</color>
+</resources>

@@ -1,9 +1,7 @@
 package sgnv.anubis.app.ui.screens
 
 import android.content.Context
-import android.graphics.Canvas
 import androidx.core.content.edit
-import androidx.core.graphics.createBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +56,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -68,6 +65,7 @@ import sgnv.anubis.app.data.DefaultRestrictedApps
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.model.InstalledAppInfo
 import sgnv.anubis.app.ui.MainViewModel
+import sgnv.anubis.app.ui.util.renderToImageBitmap
 
 private val grayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
 
@@ -390,20 +388,9 @@ private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGro
     val pm = context.packageManager
 
     val iconBitmap = remember(app.packageName) {
-        try {
-            val drawable = pm.getApplicationIcon(app.packageName)
-            val bmp =
-                createBitmap(
-                    drawable.intrinsicWidth.coerceAtLeast(1),
-                    drawable.intrinsicHeight.coerceAtLeast(1)
-                )
-            val canvas = Canvas(bmp)
-            drawable.setBounds(0, 0, canvas.width, canvas.height)
-            drawable.draw(canvas)
-            bmp.asImageBitmap()
-        } catch (e: Exception) {
-            null
-        }
+        runCatching {
+            pm.getApplicationIcon(app.packageName).renderToImageBitmap()
+        }.getOrNull()
     }
 
     val containerColor = when (app.group) {

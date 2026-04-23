@@ -6,9 +6,8 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.widget.RemoteViews
+import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.R
 
 class StealthWidgetProvider : AppWidgetProvider() {
@@ -29,15 +28,15 @@ class StealthWidgetProvider : AppWidgetProvider() {
     companion object {
         const val ACTION_TOGGLE = "sgnv.anubis.app.WIDGET_TOGGLE"
 
-        const val COLOR_ACTIVE = 0xFF4CAF50.toInt()
-        const val COLOR_INACTIVE = 0xFF9E9E9E.toInt()
-        const val COLOR_WORKING = 0xFFFFAA00.toInt()
+        fun activeColor(context: Context): Int = context.getColor(R.color.widget_icon_active)
+        fun inactiveColor(context: Context): Int = context.getColor(R.color.widget_icon_inactive)
+        fun workingColor(context: Context): Int = context.getColor(R.color.widget_icon_working)
 
         fun updateAllWidgets(context: Context) {
             val vpnActive = isVpnActive(context)
             updateAllWidgets(
                 context,
-                if (vpnActive) "Stealth ON" else "Stealth OFF",
+                if (vpnActive) context.getString(R.string.stealth_status_on) else context.getString(R.string.stealth_status_off),
                 if (vpnActive) COLOR_ACTIVE else COLOR_INACTIVE
             )
         }
@@ -53,7 +52,7 @@ class StealthWidgetProvider : AppWidgetProvider() {
             val vpnActive = isVpnActive(context)
             manager.updateAppWidget(widgetId, buildViews(
                 context,
-                if (vpnActive) "Stealth ON" else "Stealth OFF",
+                if (vpnActive) context.getString(R.string.stealth_status_on) else context.getString(R.string.stealth_status_off),
                 if (vpnActive) COLOR_ACTIVE else COLOR_INACTIVE
             ))
         }
@@ -74,15 +73,8 @@ class StealthWidgetProvider : AppWidgetProvider() {
         }
 
         fun isVpnActive(context: Context): Boolean {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            return try {
-                cm.allNetworks.any { network ->
-                    cm.getNetworkCapabilities(network)
-                        ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-                }
-            } catch (e: Exception) {
-                false
-            }
+            val app = context.applicationContext as AnubisApp
+            return app.vpnClientManager.vpnActive.value
         }
     }
 }

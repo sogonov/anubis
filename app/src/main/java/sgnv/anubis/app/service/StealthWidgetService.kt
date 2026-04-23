@@ -49,7 +49,7 @@ class StealthWidgetService : Service() {
         StealthWidgetProvider.updateAllWidgets(
             this,
             if (willBeActive) "Замораживаю..." else "Отключаю VPN...",
-            StealthWidgetProvider.COLOR_WORKING
+            StealthWidgetProvider.workingColor(this)
         )
 
         scope.launch {
@@ -59,7 +59,7 @@ class StealthWidgetService : Service() {
                 val progressJob = launch {
                     orchestrator.progressText.filterNotNull().collect { text ->
                         StealthWidgetProvider.updateAllWidgets(
-                            this@StealthWidgetService, text, StealthWidgetProvider.COLOR_WORKING
+                            this@StealthWidgetService, text, StealthWidgetProvider.workingColor(this@StealthWidgetService)
                         )
                     }
                 }
@@ -75,7 +75,9 @@ class StealthWidgetService : Service() {
                         progressJob.join()
                         if (orchestrator.lastError.value == null) {
                             StealthWidgetProvider.updateAllWidgets(
-                                this@StealthWidgetService, "Подключаю...", StealthWidgetProvider.COLOR_WORKING
+                                this@StealthWidgetService,
+                                "Подключаю...",
+                                StealthWidgetProvider.workingColor(this@StealthWidgetService)
                             )
                             withTimeoutOrNull(VPN_CONNECT_TIMEOUT_MS) {
                                 vpnClientManager.vpnActive.first { it }

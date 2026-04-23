@@ -1,9 +1,7 @@
 package sgnv.anubis.app.ui.screens
 
 import android.content.Intent
-import android.graphics.Canvas
 import androidx.core.net.toUri
-import androidx.core.graphics.createBitmap
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -53,18 +51,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import sgnv.anubis.app.R
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.model.ManagedApp
 import sgnv.anubis.app.service.StealthState
 import sgnv.anubis.app.shizuku.SHIZUKU_PACKAGE
 import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.ui.MainViewModel
+import sgnv.anubis.app.ui.util.renderToImageBitmap
 
 private val grayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
 
@@ -98,12 +98,14 @@ fun HomeScreen(
     val manualUnfreezeWarning by viewModel.manualUnfreezeWarning.collectAsState()
 
     val isEnabled = stealthState == StealthState.ENABLED
-    val isTransitioning = stealthState == StealthState.ENABLING || stealthState == StealthState.DISABLING
+    val isTransitioning = stealthState == StealthState.ENABLING
+        || stealthState == StealthState.DISABLING
+        || stealthState == StealthState.UNFREEZING
 
     val statusColor by animateColorAsState(
         when (stealthState) {
             StealthState.ENABLED -> Color(0xFF2E7D32)
-            StealthState.ENABLING, StealthState.DISABLING -> Color(0xFFF57F17)
+            StealthState.ENABLING, StealthState.DISABLING, StealthState.UNFREEZING -> Color(0xFFF57F17)
             StealthState.DISABLED -> MaterialTheme.colorScheme.surfaceVariant
         },
         label = "statusColor"
@@ -152,10 +154,11 @@ fun HomeScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         when (stealthState) {
-                            StealthState.ENABLED -> "ЗАЩИТА АКТИВНА"
-                            StealthState.ENABLING -> "ВКЛЮЧЕНИЕ..."
-                            StealthState.DISABLING -> "ОТКЛЮЧЕНИЕ..."
-                            StealthState.DISABLED -> "ЗАЩИТА ОТКЛЮЧЕНА"
+                            StealthState.ENABLED -> stringResource(R.string.home_status_enabled)
+                            StealthState.ENABLING -> stringResource(R.string.home_status_enabling)
+                            StealthState.DISABLING -> stringResource(R.string.home_status_disabling)
+                            StealthState.UNFREEZING -> stringResource(R.string.home_status_unfreezing)
+                            StealthState.DISABLED -> stringResource(R.string.home_status_disabled)
                         },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
@@ -464,16 +467,9 @@ fun HomeScreen(
             catch (e: Exception) { pkg }
         }
         val iconBitmap = remember(pkg) {
-            try {
-                val drawable = pm.getApplicationIcon(pkg)
-                val bmp = createBitmap(
-                    drawable.intrinsicWidth.coerceAtLeast(1),
-                    drawable.intrinsicHeight.coerceAtLeast(1))
-                val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, canvas.width, canvas.height)
-                drawable.draw(canvas)
-                bmp.asImageBitmap()
-            } catch (e: Exception) { null }
+            runCatching {
+                pm.getApplicationIcon(pkg).renderToImageBitmap()
+            }.getOrNull()
         }
 
         ModalBottomSheet(
@@ -621,17 +617,9 @@ private fun AppIconItem(
     }
 
     val iconBitmap = remember(packageName) {
-        try {
-            val drawable = pm.getApplicationIcon(packageName)
-            val bmp = createBitmap(
-                drawable.intrinsicWidth.coerceAtLeast(1),
-                drawable.intrinsicHeight.coerceAtLeast(1)
-            )
-            val canvas = Canvas(bmp)
-            drawable.setBounds(0, 0, canvas.width, canvas.height)
-            drawable.draw(canvas)
-            bmp.asImageBitmap()
-        } catch (e: Exception) { null }
+        runCatching {
+            pm.getApplicationIcon(packageName).renderToImageBitmap()
+        }.getOrNull()
     }
 
     Column(

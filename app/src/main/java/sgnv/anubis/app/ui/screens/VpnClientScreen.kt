@@ -1,7 +1,5 @@
 package sgnv.anubis.app.ui.screens
 
-import androidx.core.graphics.createBitmap
-import android.graphics.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,13 +42,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import sgnv.anubis.app.ui.MainViewModel
+import sgnv.anubis.app.ui.util.renderToImageBitmap
 import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientControls
 import sgnv.anubis.app.vpn.VpnClientType
@@ -291,17 +289,9 @@ fun VpnClientScreen(
 
             if (showOtherApps) items(otherApps, key = { "app_${it.packageName}" }) { app ->
                 val iconBitmap = remember(app.packageName) {
-                    try {
-                        val drawable = pm.getApplicationIcon(app.packageName)
-                        val bmp = createBitmap(
-                            drawable.intrinsicWidth.coerceAtLeast(1),
-                            drawable.intrinsicHeight.coerceAtLeast(1)
-                        )
-                        val canvas = Canvas(bmp)
-                        drawable.setBounds(0, 0, canvas.width, canvas.height)
-                        drawable.draw(canvas)
-                        bmp.asImageBitmap()
-                    } catch (e: Exception) { null }
+                    runCatching {
+                        pm.getApplicationIcon(app.packageName).renderToImageBitmap()
+                    }.getOrNull()
                 }
                 val isSelected = isCustomSelected && selectedClient.packageName == app.packageName
                 Row(

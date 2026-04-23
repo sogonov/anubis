@@ -40,6 +40,7 @@ import org.json.JSONObject
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import sgnv.anubis.app.R
+import sgnv.anubis.app.ui.util.renderToBitmap
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -96,6 +97,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Exposes issue #31 behavior to Compose settings UI.
     private val _unfreezeManagedAppsOnVpnToggle = MutableStateFlow(false)
     val unfreezeManagedAppsOnVpnToggle: StateFlow<Boolean> = _unfreezeManagedAppsOnVpnToggle
+    
+    private val _launcherSafeMode = MutableStateFlow(false)
+    val launcherSafeMode: StateFlow<Boolean> = _launcherSafeMode
 
     private val _dangerousAppWarning = MutableStateFlow<String?>(null)
     val dangerousAppWarning: StateFlow<String?> = _dangerousAppWarning
@@ -131,6 +135,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeVpnState()
         loadBackgroundMonitoring()
         loadUnfreezeManagedAppsOnVpnToggle()
+        loadLauncherSafeMode()
         checkDangerousApps()
         loadUpdateCheckPref()
         autoCheckForUpdates()
@@ -276,10 +281,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             Icon.createWithAdaptiveBitmap(bmp)
         } else {
-            val bmp = createBitmap(visibleSize, visibleSize)
-            val canvas = Canvas(bmp)
-            drawable.setBounds(0, 0, visibleSize, visibleSize)
-            drawable.draw(canvas)
+            val bmp = drawable.renderToBitmap(visibleSize, visibleSize)
             Icon.createWithBitmap(bmp)
         }
     }
@@ -500,6 +502,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Load once on startup; services read the same flag directly from shared prefs.
         _unfreezeManagedAppsOnVpnToggle.value = AppSettings.prefs(getApplication())
             .getBoolean(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE, false)
+    }
+
+    fun setLauncherSafeMode(enabled: Boolean) {
+        _launcherSafeMode.value = enabled
+        AppSettings.prefs(getApplication())
+            .edit {
+                putBoolean(AppSettings.KEY_LAUNCHER_SAFE_MODE, enabled)
+            }
+    }
+
+    private fun loadLauncherSafeMode() {
+        _launcherSafeMode.value = AppSettings.shouldUseLauncherSafeMode(getApplication())
     }
 
     fun dismissDangerousAppWarning() {
