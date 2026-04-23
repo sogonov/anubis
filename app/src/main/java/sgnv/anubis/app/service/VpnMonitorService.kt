@@ -9,6 +9,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import androidx.core.app.NotificationCompat
@@ -108,7 +109,8 @@ class VpnMonitorService : Service() {
     }
 
     private fun isOwnVpnNetwork(cm: ConnectivityManager, network: Network): Boolean = try {
-        cm.getNetworkCapabilities(network)?.ownerUid == Process.myUid()
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                (cm.getNetworkCapabilities(network)?.ownerUid == Process.myUid())
     } catch (_: Exception) {
         false
     }
