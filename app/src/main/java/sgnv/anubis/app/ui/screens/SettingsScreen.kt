@@ -13,7 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,12 +49,12 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        Text("Настройки", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("Настройки", style = typography.headlineSmall, fontWeight = FontWeight.Bold)
 
         Spacer(Modifier.height(24.dp))
 
         // Background monitoring
-        Text("Мониторинг", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("Мониторинг", style = typography.titleMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
 
         val bgMonitoring by viewModel.backgroundMonitoring.collectAsState()
@@ -65,11 +66,11 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Фоновый мониторинг VPN", style = MaterialTheme.typography.bodyMedium)
+                    Text("Фоновый мониторинг VPN", style = typography.bodyMedium)
                     Text(
                         "Автозаморозка при изменении VPN вне Anubis",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
                     )
                 }
                 androidx.compose.material3.Switch(
@@ -86,7 +87,7 @@ fun SettingsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = androidx.compose.material3.CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                containerColor = colorScheme.surfaceVariant
             )
         ) {
             Row(
@@ -97,18 +98,18 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "Размораживать группы при включении/отключении VPN",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = typography.bodyMedium
                     )
                     Text(
                         "После включения VPN размораживает «Только VPN», после отключения — «Без VPN».",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "Устаревший переключатель. Будет удалён в v0.1.5. Вместо него используйте группу «Без VPN + уведомления» для нужных приложений.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        style = typography.bodySmall,
+                        color = colorScheme.error
                     )
                 }
                 androidx.compose.material3.Switch(
@@ -129,12 +130,12 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.settings_launcher_safe_mode_title),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = typography.bodyMedium
                     )
                     Text(
                         stringResource(R.string.settings_launcher_safe_mode_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
                     )
                 }
                 androidx.compose.material3.Switch(
@@ -148,7 +149,7 @@ fun SettingsScreen(
 
         // Shizuku status — clickable when not ready: opens Shizuku activity, the download page,
         // or requests permission depending on the state (issue #84).
-        Text("Shizuku", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("Shizuku", style = typography.titleMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         val shizukuContext = LocalContext.current
         val shizukuCardModifier = when (shizukuStatus) {
@@ -159,36 +160,43 @@ fun SettingsScreen(
                 if (launch != null) shizukuContext.startActivity(launch)
             }
             ShizukuStatus.NOT_INSTALLED -> Modifier.fillMaxWidth().clickable {
-                shizukuContext.startActivity(Intent(Intent.ACTION_VIEW, "https://shizuku.rikka.app/download/".toUri()))
+                shizukuContext.startActivity(
+                    Intent(Intent.ACTION_VIEW, SettingsScreenConstants.SHIZUKU_DOWNLOAD_URL.toUri())
+                )
             }
         }
         Card(modifier = shizukuCardModifier) {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Статус", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.settings_shizuku_status_label), style = typography.bodyMedium)
                     if (shizukuStatus != ShizukuStatus.READY) {
-                        Text(
-                            when (shizukuStatus) {
-                                ShizukuStatus.NOT_INSTALLED -> "Нажмите, чтобы скачать"
-                                ShizukuStatus.NOT_RUNNING -> "Нажмите, чтобы открыть Shizuku"
-                                ShizukuStatus.NO_PERMISSION -> "Нажмите, чтобы выдать разрешение"
-                                ShizukuStatus.READY -> "" // unreachable
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        val hintRes = when (shizukuStatus) {
+                            ShizukuStatus.NOT_INSTALLED -> R.string.settings_shizuku_hint_not_installed
+                            ShizukuStatus.NOT_RUNNING -> R.string.settings_shizuku_hint_not_running
+                            ShizukuStatus.NO_PERMISSION -> R.string.settings_shizuku_hint_no_permission
+                            ShizukuStatus.READY -> null
+                        }
+                        hintRes?.let {
+                            Text(
+                                stringResource(it),
+                                style = typography.bodySmall,
+                                color = colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 Text(
-                    when (shizukuStatus) {
-                        ShizukuStatus.READY -> "Подключён"
-                        ShizukuStatus.NO_PERMISSION -> "Нет разрешения"
-                        ShizukuStatus.NOT_RUNNING -> "Не запущен"
-                        ShizukuStatus.NOT_INSTALLED -> "Не установлен"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
+                    stringResource(
+                        when (shizukuStatus) {
+                            ShizukuStatus.READY -> R.string.settings_shizuku_value_ready
+                            ShizukuStatus.NO_PERMISSION -> R.string.settings_shizuku_value_no_permission
+                            ShizukuStatus.NOT_RUNNING -> R.string.settings_shizuku_value_not_running
+                            ShizukuStatus.NOT_INSTALLED -> R.string.settings_shizuku_value_not_installed
+                        }
+                    ),
+                    style = typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = if (shizukuStatus == ShizukuStatus.READY) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    color = if (shizukuStatus == ShizukuStatus.READY) colorScheme.primary else colorScheme.error
                 )
             }
         }
@@ -236,30 +244,34 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Восстановление", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                     Text(
-                        "Разморозить приложения, очистить группы",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        stringResource(R.string.recovery_title),
+                        style = typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        stringResource(R.string.settings_recovery_description),
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
                     )
                 }
-                Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
             }
         }
 
         Spacer(Modifier.height(24.dp))
 
         // About
-        Text("О приложении", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("О приложении", style = typography.titleMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Anubis v${sgnv.anubis.app.BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    style = typography.bodyLarge, fontWeight = FontWeight.Bold)
                 Text(
                     "Управляет группами приложений и VPN-подключением. Изолирует приложения по группам для контроля сетевого доступа.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -273,11 +285,11 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Проверять обновления", style = MaterialTheme.typography.bodyMedium)
+                        Text("Проверять обновления", style = typography.bodyMedium)
                         Text(
                             "Автоматическая проверка при запуске",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = typography.bodySmall,
+                            color = colorScheme.onSurfaceVariant
                         )
                     }
                     androidx.compose.material3.Switch(
@@ -295,15 +307,15 @@ fun SettingsScreen(
                     ) {
                         Text(
                             if (updateCheckInProgress) "Проверка..." else "Проверить сейчас",
-                            style = MaterialTheme.typography.labelMedium
+                            style = typography.labelMedium
                         )
                     }
                     updateInfo?.let { info ->
                         if (!info.isUpdateAvailable) {
                             Text(
                                 "У вас последняя версия",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = typography.bodySmall,
+                                color = colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -312,17 +324,27 @@ fun SettingsScreen(
                 val context = LocalContext.current
                 Column {
                     TextButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/sogonov/anubis".toUri()))
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, SettingsScreenConstants.GITHUB_URL.toUri())
+                        )
                     }) {
-                        Text("GitHub", style = MaterialTheme.typography.labelMedium)
+                        Text("GitHub", style = typography.labelMedium)
                     }
                     TextButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://t.me/anubis_app".toUri()))
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, SettingsScreenConstants.TELEGRAM_URL.toUri())
+                        )
                     }) {
-                        Text("Telegram", style = MaterialTheme.typography.labelMedium)
+                        Text("Telegram", style = typography.labelMedium)
                     }
                 }
             }
         }
     }
+}
+
+private object SettingsScreenConstants {
+    const val SHIZUKU_DOWNLOAD_URL = "https://shizuku.rikka.app/download/"
+    const val GITHUB_URL = "https://github.com/sogonov/anubis"
+    const val TELEGRAM_URL = "https://t.me/anubis_app"
 }
