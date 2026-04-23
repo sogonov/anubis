@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "sgnv.anubis.app"
-        minSdk = 29
+        minSdk = 28
         targetSdk = 34
         versionCode = 9
         versionName = "0.1.5-beta.2"
