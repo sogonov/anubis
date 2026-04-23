@@ -1,6 +1,7 @@
 package sgnv.anubis.app.ui.screens
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.core.content.edit
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -22,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -57,10 +59,12 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import sgnv.anubis.app.R
 import sgnv.anubis.app.data.DefaultRestrictedApps
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.model.InstalledAppInfo
@@ -68,11 +72,12 @@ import sgnv.anubis.app.ui.MainViewModel
 import sgnv.anubis.app.ui.util.renderToImageBitmap
 
 private val grayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+private const val PREF_APP_LIST_LEGEND_EXPANDED = "app_list_legend_expanded"
 
-private enum class SortBy(val label: String) {
-    GROUP("По группе"),
-    NAME("По названию"),
-    PACKAGE("По package")
+private enum class SortBy(@StringRes val labelRes: Int) {
+    GROUP(R.string.app_list_sort_group),
+    NAME(R.string.app_list_sort_name),
+    PACKAGE(R.string.app_list_sort_package)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,6 +95,9 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var sortBy by rememberSaveable { mutableStateOf(SortBy.PACKAGE) }
     var sortMenuOpen by remember { mutableStateOf(false) }
+    var legendExpanded by remember {
+        mutableStateOf(prefs.getBoolean(PREF_APP_LIST_LEGEND_EXPANDED, true))
+    }
 
     var showAutoWarning by remember { mutableStateOf(false) }
     val dismissAutoWarning: () -> Unit = { showAutoWarning = false }
@@ -136,20 +144,20 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
                 singleLine = true,
-                placeholder = { Text("Название или package") },
+                placeholder = { Text(stringResource(R.string.app_list_search_placeholder)) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 leadingIcon = {
                     IconButton(onClick = {
                         searchActive = false
                         searchQuery = ""
                     }) {
-                        Icon(Icons.Default.Close, contentDescription = "Закрыть поиск")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.app_list_cd_close_search))
                     }
                 },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Очистить")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_clear))
                         }
                     }
                 }
@@ -170,20 +178,26 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 ) {
-                    Text("Авто-выбор", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.app_list_auto_select), style = MaterialTheme.typography.labelMedium)
                 }
                 Text(
-                    "Без VPN: $noVpnCount | Увед.: $autoUnfreezeCount | Только VPN: $vpnOnlyCount | С VPN: $launchCount",
+                    stringResource(
+                        R.string.app_list_group_counts,
+                        noVpnCount,
+                        autoUnfreezeCount,
+                        vpnOnlyCount,
+                        launchCount
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f).padding(start = 8.dp)
                 )
                 IconButton(onClick = { searchActive = true }) {
-                    Icon(Icons.Default.Search, contentDescription = "Поиск")
+                    Icon(Icons.Default.Search, contentDescription = stringResource(R.string.common_search))
                 }
                 Box {
                     TextButton(onClick = { sortMenuOpen = true }) {
-                        Text(sortBy.label, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(sortBy.labelRes), style = MaterialTheme.typography.labelMedium)
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                     }
                     DropdownMenu(
@@ -192,7 +206,7 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     ) {
                         SortBy.entries.forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(option.label) },
+                                text = { Text(stringResource(option.labelRes)) },
                                 onClick = {
                                     sortBy = option
                                     sortMenuOpen = false
@@ -207,44 +221,83 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
 
         // Legend
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    legendExpanded = !legendExpanded
+                    prefs.edit { putBoolean(PREF_APP_LIST_LEGEND_EXPANDED, legendExpanded) }
+                },
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            LegendRow(
-                color = MaterialTheme.colorScheme.error,
-                label = "Без VPN",
-                description = "При включении VPN — заморожено. Запуск только без VPN."
+            Text(
+                stringResource(R.string.app_list_group_statuses_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
             )
-            LegendRow(
-                color = MaterialTheme.colorScheme.secondary,
-                label = "Увед.",
-                description = "При VPN заморожено, без VPN — автоматически разморожено (для уведомлений)."
-            )
-            LegendRow(
-                color = MaterialTheme.colorScheme.tertiary,
-                label = "Только VPN",
-                description = "Без VPN заморожено. Запуск только через VPN."
-            )
-            LegendRow(
-                color = MaterialTheme.colorScheme.primary,
-                label = "С VPN",
-                description = "Не замораживается. При запуске автоматически включается VPN."
+            Icon(
+                imageVector = if (legendExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.ArrowDropDown,
+                contentDescription = null
             )
         }
 
+        if (legendExpanded) {
+            Spacer(Modifier.height(6.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                LegendRow(
+                    color = MaterialTheme.colorScheme.error,
+                    label = stringResource(R.string.group_label_no_vpn),
+                    description = stringResource(R.string.app_list_legend_desc_local)
+                )
+                LegendRow(
+                    color = MaterialTheme.colorScheme.secondary,
+                    label = stringResource(R.string.group_label_notify_short),
+                    description = stringResource(R.string.app_list_legend_desc_local_auto)
+                )
+                LegendRow(
+                    color = MaterialTheme.colorScheme.tertiary,
+                    label = stringResource(R.string.app_list_legend_label_vpn_only),
+                    description = stringResource(R.string.app_list_legend_desc_vpn_only)
+                )
+                LegendRow(
+                    color = MaterialTheme.colorScheme.primary,
+                    label = stringResource(R.string.group_label_with_vpn),
+                    description = stringResource(R.string.app_list_legend_desc_launch_vpn)
+                )
+            }
+        }
         Spacer(Modifier.height(8.dp))
 
         TabRow(selectedTabIndex = selectedTab) {
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
-                text = { Text("Пользовательские (${userApps.size})") }
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.app_list_tab_user_label))
+                        Text(
+                            stringResource(R.string.app_list_tab_count, userApps.size),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
             )
             Tab(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
-                text = { Text("Системные (${systemApps.size})") }
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.app_list_tab_system_label))
+                        Text(
+                            stringResource(R.string.app_list_tab_count, systemApps.size),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
             )
         }
 
@@ -277,7 +330,11 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 if (sortedList.isEmpty()) {
                     item {
                         Text(
-                            if (normalizedQuery.isBlank()) "Список пуст. Потяните вниз, чтобы обновить." else "Ничего не найдено по запросу \"$normalizedQuery\".",
+                            if (normalizedQuery.isBlank()) {
+                                stringResource(R.string.app_list_empty)
+                            } else {
+                                stringResource(R.string.app_list_not_found, normalizedQuery)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
@@ -322,23 +379,19 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     pendingFirstAdd?.let { pkg ->
         AlertDialog(
             onDismissRequest = dismissFirstAddDialog,
-            title = { Text("Добавить в группу?") },
+            title = { Text(stringResource(R.string.app_list_first_add_title)) },
             text = {
-                Text(
-                    "Приложение будет заморожено — после этого его ярлык исчезнет с рабочего стола. " +
-                    "Восстановить можно в любой момент через долгое нажатие на Главной → «Разморозить» → «Убрать из группы». " +
-                    "Для массовой отмены — раздел «Восстановление» в настройках."
-                )
+                Text(stringResource(R.string.app_list_first_add_text))
             },
             confirmButton = {
                 TextButton(onClick = {
                     prefs.edit { putBoolean("seen_first_add_warning", true) }
                     viewModel.cycleAppGroup(pkg)
                     dismissFirstAddDialog()
-                }) { Text("Добавить") }
+                }) { Text(stringResource(R.string.common_add)) }
             },
             dismissButton = {
-                TextButton(onClick = dismissFirstAddDialog) { Text("Отмена") }
+                TextButton(onClick = dismissFirstAddDialog) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -346,25 +399,19 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     if (showAutoWarning) {
         AlertDialog(
             onDismissRequest = dismissAutoWarning,
-            title = { Text("Перед заморозкой") },
+            title = { Text(stringResource(R.string.app_list_auto_warning_title)) },
             text = {
-                Text(
-                    "Anubis заморозит известные российские приложения через системный pm disable. " +
-                    "Большинство лаунчеров уберут их иконки с рабочего стола — это не удаление, " +
-                    "приложения и данные сохранятся. Но после разморозки ярлыки не вернутся на прежние позиции — " +
-                    "придётся расставить руками.\n\n" +
-                    "Если что-то пойдёт не так — в настройках есть раздел «Восстановление» с массовой разморозкой."
-                )
+                Text(stringResource(R.string.app_list_auto_warning_text))
             },
             confirmButton = {
                 TextButton(onClick = {
                     prefs.edit { putBoolean("seen_auto_warning", true)}
                     dismissAutoWarning()
                     viewModel.autoSelectRestricted()
-                }) { Text("Заморозить") }
+                }) { Text(stringResource(R.string.common_freeze)) }
             },
             dismissButton = {
-                TextButton(onClick = dismissAutoWarning) { Text("Отмена") }
+                TextButton(onClick = dismissAutoWarning) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -475,11 +522,11 @@ private fun AppRow(
             // Group badge
             Text(
                 when (app.group) {
-                    AppGroup.LOCAL -> "Без VPN"
-                    AppGroup.LOCAL_AUTO_UNFREEZE -> "Увед."
-                    AppGroup.VPN_ONLY -> "VPN"
-                    AppGroup.LAUNCH_VPN -> "С VPN"
-                    null -> "—"
+                    AppGroup.LOCAL -> stringResource(R.string.group_label_no_vpn)
+                    AppGroup.LOCAL_AUTO_UNFREEZE -> stringResource(R.string.group_label_notify_short)
+                    AppGroup.VPN_ONLY -> stringResource(R.string.app_list_group_badge_vpn_only)
+                    AppGroup.LAUNCH_VPN -> stringResource(R.string.group_label_with_vpn)
+                    null -> stringResource(R.string.app_list_group_badge_none)
                 },
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
