@@ -94,10 +94,16 @@ fun AddAppSheet(
     }
 
     val groupLabel = when (targetGroup) {
-        AppGroup.LOCAL -> "Без VPN"
-        AppGroup.LOCAL_AUTO_UNFREEZE -> "Без VPN + уведомления"
-        AppGroup.VPN_ONLY -> "Только VPN"
-        AppGroup.LAUNCH_VPN -> "С VPN"
+        AppGroup.LOCAL -> stringResource(R.string.group_label_no_vpn)
+        AppGroup.LOCAL_AUTO_UNFREEZE -> stringResource(R.string.add_app_sheet_group_local_auto_full)
+        AppGroup.VPN_ONLY -> stringResource(R.string.app_list_legend_label_vpn_only)
+        AppGroup.LAUNCH_VPN -> stringResource(R.string.group_label_with_vpn)
+    }
+    val groupColor = when (targetGroup) {
+        AppGroup.LOCAL -> MaterialTheme.colorScheme.error
+        AppGroup.LOCAL_AUTO_UNFREEZE -> MaterialTheme.colorScheme.secondary
+        AppGroup.VPN_ONLY -> MaterialTheme.colorScheme.tertiary
+        AppGroup.LAUNCH_VPN -> MaterialTheme.colorScheme.primary
     }
 
     ModalBottomSheet(
@@ -109,18 +115,27 @@ fun AddAppSheet(
                 .padding(horizontal = 16.dp)
                 .imePadding()
         ) {
-            Text(
-                "Добавить в «$groupLabel»",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.add_app_sheet_add_to_prefix),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    stringResource(R.string.add_app_sheet_group_quoted, groupLabel),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = groupColor
+                )
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("Поиск по названию или package") }
+                placeholder = { Text(stringResource(R.string.app_list_search_placeholder)) }
             )
             Spacer(Modifier.height(8.dp))
             LazyColumn(
@@ -131,9 +146,9 @@ fun AddAppSheet(
                     item {
                         Text(
                             if (normalizedQuery.isBlank())
-                                "Нет приложений, подходящих для добавления."
+                                stringResource(R.string.add_app_sheet_empty_for_add)
                             else
-                                "Ничего не найдено по запросу \"$normalizedQuery\".",
+                                stringResource(R.string.app_list_not_found, normalizedQuery),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)
@@ -178,15 +193,21 @@ fun AddAppSheet(
                         }
                         if (app.group != null) {
                             val currentLabel = when (app.group) {
-                                AppGroup.LOCAL -> "Без VPN"
-                                AppGroup.LOCAL_AUTO_UNFREEZE -> "Увед."
-                                AppGroup.VPN_ONLY -> "Только VPN"
-                                AppGroup.LAUNCH_VPN -> "С VPN"
+                                AppGroup.LOCAL -> stringResource(R.string.group_label_no_vpn)
+                                AppGroup.LOCAL_AUTO_UNFREEZE -> stringResource(R.string.group_label_notify_short)
+                                AppGroup.VPN_ONLY -> stringResource(R.string.app_list_legend_label_vpn_only)
+                                AppGroup.LAUNCH_VPN -> stringResource(R.string.group_label_with_vpn)
+                            }
+                            val currentColor = when (app.group) {
+                                AppGroup.LOCAL -> MaterialTheme.colorScheme.error
+                                AppGroup.LOCAL_AUTO_UNFREEZE -> MaterialTheme.colorScheme.secondary
+                                AppGroup.VPN_ONLY -> MaterialTheme.colorScheme.tertiary
+                                AppGroup.LAUNCH_VPN -> MaterialTheme.colorScheme.primary
                             }
                             Text(
                                 currentLabel,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = currentColor
                             )
                             Spacer(Modifier.width(8.dp))
                         }
@@ -213,7 +234,7 @@ fun AddAppSheet(
                     enabled = selectedPackages.isNotEmpty() && !isApplying,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Сбросить")
+                    Text(stringResource(R.string.common_reset))
                 }
                 Button(
                     onClick = {
@@ -227,7 +248,7 @@ fun AddAppSheet(
                     enabled = selectedPackages.isNotEmpty() && !isApplying,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Готово")
+                    Text(stringResource(R.string.common_done))
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -246,7 +267,10 @@ fun AddAppSheet(
                     )
                     Spacer(Modifier.height(8.dp))
                     offenders.forEach { pkg ->
-                        Text("• $pkg", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            stringResource(R.string.add_app_sheet_bullet_package, pkg),
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             },

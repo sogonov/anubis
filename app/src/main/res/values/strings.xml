@@ -3,6 +3,14 @@
     <string name="app_name">Anubis</string>
     <string name="tile_label">Anubis</string>
 
+    <string name="common_add">Добавить</string>
+    <string name="common_cancel">Отмена</string>
+    <string name="common_clear">Очистить</string>
+    <string name="common_done">Готово</string>
+    <string name="common_freeze">Заморозить</string>
+    <string name="common_reset">Сбросить</string>
+    <string name="common_search">Поиск</string>
+
     <string name="startup_status_scanning_progress">Сканирование приложений: %1$d / %2$d</string>
     <string name="startup_status_preparing_launch">Подготовка к запуску…</string>
     <string name="startup_version_format">Версия %1$s</string>
@@ -17,14 +25,47 @@
     <string name="add_app_sheet_no_safe_apps">Нет безопасных приложений для добавления</string>
     <string name="add_app_sheet_add_safe">Добавить только безопасные</string>
     <string name="add_app_sheet_add_anyway">Добавить все</string>
+    <string name="add_app_sheet_empty_for_add">Нет приложений, подходящих для добавления.</string>
+    <string name="add_app_sheet_group_local_auto_full">Без VPN + уведомления</string>
+    <string name="add_app_sheet_group_quoted">«%1$s»</string>
+    <string name="add_app_sheet_add_to_prefix">Добавить в</string>
+    <string name="add_app_sheet_bullet_package">• %1$s</string>
 
-    <string name="common_cancel">Отмена</string>
+    <string name="app_list_auto_select">Авто-выбор</string>
+    <string name="app_list_auto_warning_text">Anubis заморозит известные российские приложения через системный pm disable. Большинство лаунчеров уберут их иконки с рабочего стола — это не удаление, приложения и данные сохранятся. Но после разморозки ярлыки не вернутся на прежние позиции — придётся расставить руками.\n\nЕсли что-то пойдёт не так — в настройках есть раздел «Восстановление» с массовой разморозкой.</string>
+    <string name="app_list_auto_warning_title">Перед заморозкой</string>
+    <string name="app_list_cd_close_search">Закрыть поиск</string>
+    <string name="app_list_empty">Список пуст. Потяните вниз, чтобы обновить.</string>
+    <string name="app_list_first_add_text">Приложение будет заморожено — после этого его ярлык исчезнет с рабочего стола. Восстановить можно в любой момент через долгое нажатие на Главной → «Разморозить» → «Убрать из группы». Для массовой отмены — раздел «Восстановление» в настройках.</string>
+    <string name="app_list_first_add_title">Добавить в группу?</string>
+    <string name="app_list_group_badge_none">—</string>
+    <string name="app_list_group_badge_vpn_only">VPN</string>
+    <string name="app_list_group_counts">Без VPN: %1$d | Увед.: %2$d | Только VPN: %3$d | С VPN: %4$d</string>
+    <string name="app_list_group_statuses_title">Статусы групп</string>
+    <string name="app_list_legend_desc_launch_vpn">Не замораживается. При запуске автоматически включается VPN.</string>
+    <string name="app_list_legend_desc_local">При включении VPN — заморожено. Запуск только без VPN.</string>
+    <string name="app_list_legend_desc_local_auto">При VPN заморожено, без VPN — автоматически разморожено (для уведомлений).</string>
+    <string name="app_list_legend_desc_vpn_only">Без VPN заморожено. Запуск только через VPN.</string>
+    <string name="app_list_legend_label_vpn_only">Только VPN</string>
+    <string name="app_list_not_found">Ничего не найдено по запросу \"%1$s\".</string>
+    <string name="app_list_search_placeholder">Название или package</string>
+    <string name="app_list_sort_group">По группе</string>
+    <string name="app_list_sort_name">По названию</string>
+    <string name="app_list_sort_package">По package</string>
+    <string name="app_list_tab_count">(%1$d)</string>
+    <string name="app_list_tab_system_label">Системные</string>
+    <string name="app_list_tab_user_label">Пользовательские</string>
+
+    <string name="group_label_no_vpn">Без VPN</string>
+    <string name="group_label_notify_short">Увед.</string>
+    <string name="group_label_with_vpn">С VPN</string>
+
+    <string name="home_status_disabled">ЗАЩИТА ОТКЛЮЧЕНА</string>
+    <string name="home_status_disabling">ОТКЛЮЧЕНИЕ...</string>
     <string name="home_status_enabled">ЗАЩИТА АКТИВНА</string>
     <string name="home_status_enabling">ВКЛЮЧЕНИЕ...</string>
-    <string name="home_status_disabling">ОТКЛЮЧЕНИЕ...</string>
     <string name="home_status_unfreezing">РАЗМОРОЗКА...</string>
-    <string name="home_status_disabled">ЗАЩИТА ОТКЛЮЧЕНА</string>
 
-    <string name="settings_launcher_safe_mode_title">Безопасный режим лаунчера</string>
     <string name="settings_launcher_safe_mode_description">Уменьшает вероятность дубликатов ярлыков: массовая разморозка выполняется по одному приложению с короткой паузой.</string>
+    <string name="settings_launcher_safe_mode_title">Безопасный режим лаунчера</string>
 </resources>
