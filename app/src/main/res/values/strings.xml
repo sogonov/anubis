@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Anubis</string>
     <string name="tile_label">Anubis</string>
@@ -11,4 +11,12 @@
     <string name="add_app_sheet_add_anyway">Добавить все</string>
 
     <string name="common_cancel">Отмена</string>
+    <string name="home_status_enabled">ЗАЩИТА АКТИВНА</string>
+    <string name="home_status_enabling">ВКЛЮЧЕНИЕ...</string>
+    <string name="home_status_disabling">ОТКЛЮЧЕНИЕ...</string>
+    <string name="home_status_unfreezing">РАЗМОРОЗКА...</string>
+    <string name="home_status_disabled">ЗАЩИТА ОТКЛЮЧЕНА</string>
+
+    <string name="settings_launcher_safe_mode_title">Безопасный режим лаунчера</string>
+    <string name="settings_launcher_safe_mode_description">Уменьшает вероятность дубликатов ярлыков: массовая разморозка выполняется по одному приложению с короткой паузой.</string>
 </resources>
