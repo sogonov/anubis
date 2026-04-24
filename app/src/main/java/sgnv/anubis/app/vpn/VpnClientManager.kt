@@ -8,6 +8,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 import sgnv.anubis.app.shizuku.ShizukuManager
+import sgnv.anubis.app.util.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -165,6 +166,7 @@ class VpnClientManager(
                 // fallback steps. If we hide our dummy, waitForVpnOff exits early and
                 // launchLocal unfreezes with the external VPN still up (issue #63).
                 _vpnActive.value = true
+                AppLogger.i(TAG, "VPN network available: id=${network.hashCode()}")
                 CoroutineScope(Dispatchers.IO).launch { detectActiveVpnClient() }
             }
 
@@ -174,6 +176,7 @@ class VpnClientManager(
                 // this the check sees the dying network and _vpnActive stays true.
                 val stillActive = isVpnCurrentlyActive(cm, exclude = network)
                 _vpnActive.value = stillActive
+                AppLogger.i(TAG, "VPN network lost: id=${network.hashCode()}, stillActive=$stillActive")
                 if (!stillActive) {
                     _activeVpnClient.value = null
                     _activeVpnPackage.value = null
@@ -193,7 +196,8 @@ class VpnClientManager(
             try {
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                 cm.unregisterNetworkCallback(it)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "unregisterNetworkCallback failed in stopMonitoringVpn", e)
             }
             networkCallback = null
         }

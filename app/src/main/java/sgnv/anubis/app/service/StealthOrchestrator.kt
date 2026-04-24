@@ -5,6 +5,7 @@ import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
 import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.shizuku.ShizukuManager
+import sgnv.anubis.app.util.AppLogger
 import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientControls
 import sgnv.anubis.app.vpn.VpnClientManager
@@ -87,6 +88,7 @@ class StealthOrchestrator(
      * VPN_ONLY stays frozen — they are only unfrozen by explicit launch.
      */
     suspend fun enable(client: SelectedVpnClient) = withContext(Dispatchers.Default) {
+        AppLogger.i(TAG, "enable requested, client=${client.packageName}")
         // Detached-job pattern: enableImpl runs in a process-wide scope, we wait via
         // job.join() with a hard timeout. Why: the original `withTimeoutOrNull(120s) {
         // enableImpl(...) }` couldn't fire because enableImpl's chain hits a
@@ -122,7 +124,8 @@ class StealthOrchestrator(
         if (!checkShizuku()) return
 
         if (shouldFreezeClientInIdle(client.packageName)) {
-            shizukuManager.unfreezeApp(client.packageName)
+            val result = shizukuManager.unfreezeApp(client.packageName)
+            logShizukuFailure("enableImpl.unfreezeClient", client.packageName, result)
         }
 
         if (shizukuManager.isAppFrozen(client.packageName)) {
@@ -141,13 +144,19 @@ class StealthOrchestrator(
         _progressText.value = "Запускаю VPN..."
         val startError = vpnClientManager.startVPN(client)
         if (startError != null) {
+            AppLogger.e(TAG, "VPN start command failed: ${client.packageName}; error=$startError")
             fail(startError)
             return
         }
+        AppLogger.i(TAG, "VPN start command sent: ${client.packageName}")
 
         if (client.controlMode != VpnControlMode.MANUAL && !waitForVpnOn(10_000)) {
+            AppLogger.e(TAG, "VPN did not become active in time: ${client.packageName}")
             fail("VPN client ${client.displayName} did not come up in time.")
             return
+        }
+        if (client.controlMode != VpnControlMode.MANUAL) {
+            AppLogger.i(TAG, "VPN became active: ${client.packageName}")
         }
 
         bumpVersion()
@@ -172,6 +181,7 @@ class StealthOrchestrator(
      * LOCAL stays frozen — they are only unfrozen by explicit launch.
      */
     suspend fun disable(client: SelectedVpnClient, detectedPackage: String?) = withContext(Dispatchers.Default) {
+        AppLogger.i(TAG, "disable requested, client=${client.packageName}, detected=${detectedPackage.orEmpty()}")
         // See comment on enable() — same detached-job + join() with timeout pattern.
         _lastError.value = null
         _state.value = StealthState.DISABLING
@@ -255,7 +265,8 @@ class StealthOrchestrator(
         }
 
         if (shizukuManager.isAppFrozen(packageName)) {
-            shizukuManager.unfreezeApp(packageName)
+            val result = shizukuManager.unfreezeApp(packageName)
+            logShizukuFailure("launchWithVpn.unfreezeApp", packageName, result)
             bumpVersion()
         }
 
@@ -281,7 +292,8 @@ class StealthOrchestrator(
         }
 
         if (shizukuManager.isAppFrozen(packageName)) {
-            shizukuManager.unfreezeApp(packageName)
+            val result = shizukuManager.unfreezeApp(packageName)
+            logShizukuFailure("launchLocal.unfreezeApp", packageName, result)
             bumpVersion()
         }
 
@@ -294,9 +306,11 @@ class StealthOrchestrator(
     suspend fun toggleAppFrozen(packageName: String) {
         if (!checkShizuku()) return
         if (shizukuManager.isAppFrozen(packageName)) {
-            shizukuManager.unfreezeApp(packageName)
+            val result = shizukuManager.unfreezeApp(packageName)
+            logShizukuFailure("toggleAppFrozen.unfreezeApp", packageName, result)
         } else {
-            shizukuManager.freezeApp(packageName)
+            val result = shizukuManager.freezeApp(packageName)
+            logShizukuFailure("toggleAppFrozen.freezeApp", packageName, result)
         }
         bumpVersion()
     }
@@ -308,21 +322,35 @@ class StealthOrchestrator(
     }
 
     private suspend fun stopVpn(client: SelectedVpnClient, detectedPackage: String?): Boolean {
+        AppLogger.i(TAG, "Stopping VPN requested: client=${client.packageName}, detected=${detectedPackage.orEmpty()}")
         // Step 1: API stop — only for SEPARATE mode (explicit stop command).
         // TOGGLE is unreliable for stop (can re-enable immediately), skip to dummy VPN.
         if (client.controlMode == VpnControlMode.SEPARATE) {
             vpnClientManager.stopVPN(client)
-            if (waitForVpnOff(3000)) return true
+            if (waitForVpnOff(VPN_OFF_WAIT_AFTER_API_STOP_MS)) {
+                AppLogger.i(TAG, "VPN stopped after API stop: ${client.packageName}")
+                return true
+            }
         }
 
         // Step 2: Dummy VPN — take over as VPN, system kills theirs
         StealthVpnService.disconnect(context)
-        if (waitForVpnOff(2000)) return true
+        if (waitForVpnOff(VPN_OFF_WAIT_AFTER_DUMMY_MS)) {
+            AppLogger.i(TAG, "VPN stopped after dummy takeover: ${client.packageName}")
+            return true
+        }
 
         // Step 3: Force-stop the detected VPN app
         val pkg = detectedPackage ?: client.packageName
         shizukuManager.forceStopApp(pkg)
-        return waitForVpnOff(2000)
+            .also { logShizukuFailure("stopVpn.forceStopApp", pkg, it) }
+        val stopped = waitForVpnOff(VPN_OFF_WAIT_AFTER_FORCE_STOP_MS)
+        if (stopped) {
+            AppLogger.i(TAG, "VPN stopped after force-stop: $pkg")
+        } else {
+            AppLogger.e(TAG, "VPN is still active after stop sequence: $pkg")
+        }
+        return stopped
     }
 
     private suspend fun checkShizuku(): Boolean {
@@ -341,8 +369,11 @@ class StealthOrchestrator(
                 async {
                     sem.withPermit {
                         if (shizukuManager.isAppInstalled(pkg) && !shizukuManager.isAppFrozen(pkg)) {
-                            shizukuManager.freezeApp(pkg)
-                            counter.incrementAndGet()
+                            val result = shizukuManager.freezeApp(pkg)
+                            logShizukuFailure("freezeGroup.freezeApp", pkg, result)
+                            if (result.isSuccess) {
+                                counter.incrementAndGet()
+                            }
                         }
                     }
                 }
@@ -357,8 +388,11 @@ class StealthOrchestrator(
             var transitioned = 0
             packages.forEachIndexed { index, pkg ->
                 if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
-                    shizukuManager.unfreezeApp(pkg)
-                    transitioned++
+                    val result = shizukuManager.unfreezeApp(pkg)
+                    logShizukuFailure("unfreezeGroup.unfreezeApp", pkg, result)
+                    if (result.isSuccess) {
+                        transitioned++
+                    }
                 }
                 // On MIUI/HyperOS and some OEM launchers, bursts of package-enabled events
                 // are handled as repeated "new app" inserts and produce duplicate icons.
@@ -375,8 +409,11 @@ class StealthOrchestrator(
                 async {
                     sem.withPermit {
                         if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
-                            shizukuManager.unfreezeApp(pkg)
-                            counter.incrementAndGet()
+                            val result = shizukuManager.unfreezeApp(pkg)
+                            logShizukuFailure("unfreezeGroup.unfreezeApp", pkg, result)
+                            if (result.isSuccess) {
+                                counter.incrementAndGet()
+                            }
                         }
                     }
                 }
@@ -395,6 +432,7 @@ class StealthOrchestrator(
             frozen > 0 -> "Заморожено $frozen за $formattedSecs с"
             else -> "Разморожено $unfrozen за $formattedSecs с"
         }
+        AppLogger.i(TAG, msg)
         _benchmark.tryEmit(msg)
     }
 
@@ -464,13 +502,21 @@ class StealthOrchestrator(
         val client = AppSettings.loadSelectedVpnClient(context)
         if (!shouldFreezeClientInIdle(client.packageName)) return
         if (!shizukuManager.awaitUserService(500)) return
-        shizukuManager.freezeApp(client.packageName)
+        val result = shizukuManager.freezeApp(client.packageName)
+        logShizukuFailure("freezeSelectedVpnClientIfNeeded.freezeApp", client.packageName, result)
+    }
+
+    private fun logShizukuFailure(op: String, packageName: String, result: Result<Unit>) {
+        if (result.isFailure) {
+            AppLogger.e(TAG, "$op failed for package=$packageName", result.exceptionOrNull())
+        }
     }
 
     private fun shouldFreezeClientInIdle(packageName: String): Boolean =
         packageName.isNotBlank() && VpnClientControls.getControlForPackage(packageName).freezeInIdle
 
     private companion object {
+        private const val TAG = "StealthOrchestrator"
         // Cap on concurrent Shizuku IPC calls during group freeze/unfreeze.
         // On Honor MagicOS parallel disable-user emits a flood of PACKAGE_REMOVED
         // broadcasts that overwhelms the stock launcher's grid repaint — 4 was
@@ -487,6 +533,10 @@ class StealthOrchestrator(
         // force-stop. If we hit this ceiling something is genuinely broken (Shizuku
         // wedged, VPN client unresponsive) — no point waiting longer.
         const val TOTAL_OP_TIMEOUT_MS = 45_000L
+
+        private const val VPN_OFF_WAIT_AFTER_API_STOP_MS = 3_000L
+        private const val VPN_OFF_WAIT_AFTER_DUMMY_MS = 2_000L
+        private const val VPN_OFF_WAIT_AFTER_FORCE_STOP_MS = 2_000L
 
         // Launcher-safe profile: serialize mass-unfreeze to avoid duplicate launcher icons.
         const val LAUNCHER_SAFE_UNFREEZE_DELAY_MS = 180L

@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.IBinder
 import android.os.Process
 import sgnv.anubis.app.IUserService
+import sgnv.anubis.app.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -130,7 +131,8 @@ class ShizukuManager(private val packageManager: PackageManager) {
         if (!isAvailable() || !hasPermission()) return
         try {
             Shizuku.bindUserService(serviceArgs, serviceConnection)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "bindUserService failed", e)
         }
     }
 
@@ -151,7 +153,8 @@ class ShizukuManager(private val packageManager: PackageManager) {
     fun unbindUserService() {
         try {
             Shizuku.unbindUserService(serviceArgs, serviceConnection, true)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "unbindUserService failed", e)
         }
         userService = null
     }
@@ -230,6 +233,7 @@ class ShizukuManager(private val packageManager: PackageManager) {
                     val service = userService ?: return@withContext null
                     service.execCommandWithOutput(args.toList().toTypedArray())
                 } catch (e: Exception) {
+                    AppLogger.e(TAG, "runCommandWithOutput failed: ${args.joinToString(" ")}", e)
                     null
                 }
             }
@@ -291,6 +295,7 @@ class ShizukuManager(private val packageManager: PackageManager) {
     }
 
     companion object {
+        private const val TAG = "ShizukuManager"
         const val REQUEST_CODE = 1001
 
         /**

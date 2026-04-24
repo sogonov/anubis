@@ -21,6 +21,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.R
 import sgnv.anubis.app.ui.MainActivity
+import sgnv.anubis.app.util.AppLogger
 import java.util.Collections
 
 /**
@@ -104,12 +105,15 @@ class VpnMonitorService : Service() {
 
         try {
             cm.registerNetworkCallback(request, networkCallback!!)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "registerNetworkCallback failed", e)
+        }
     }
 
     private fun isOwnVpnNetwork(cm: ConnectivityManager, network: Network): Boolean = try {
         cm.getNetworkCapabilities(network)?.ownerUid == Process.myUid()
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        AppLogger.e(TAG, "isOwnVpnNetwork failed", e)
         false
     }
 
@@ -119,7 +123,9 @@ class VpnMonitorService : Service() {
             try {
                 val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
                 cm.unregisterNetworkCallback(it)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "unregisterNetworkCallback failed", e)
+            }
             networkCallback = null
         }
     }
@@ -147,6 +153,7 @@ class VpnMonitorService : Service() {
     }
 
     companion object {
+        private const val TAG = "VpnMonitorService"
         const val ACTION_START = "sgnv.anubis.app.START_MONITOR"
         const val ACTION_STOP = "sgnv.anubis.app.STOP_MONITOR"
         const val NOTIFICATION_ID = 1
