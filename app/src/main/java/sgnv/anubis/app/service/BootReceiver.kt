@@ -7,6 +7,7 @@ import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
 import sgnv.anubis.app.settings.AppSettings
+import sgnv.anubis.app.util.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,7 +43,10 @@ class BootReceiver : BroadcastReceiver() {
                 val packages = repo.getPackagesByGroup(group)
                 for (pkg in packages) {
                     if (shizukuManager.isAppInstalled(pkg)) {
-                        shizukuManager.freezeApp(pkg)
+                        val result = shizukuManager.freezeApp(pkg)
+                        if (result.isFailure) {
+                            AppLogger.e(TAG, "boot.freezeApp failed for package=$pkg", result.exceptionOrNull())
+                        }
                     }
                 }
             }
@@ -52,9 +56,16 @@ class BootReceiver : BroadcastReceiver() {
             val autoUnfreezePackages = repo.getPackagesByGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
             for (pkg in autoUnfreezePackages) {
                 if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
-                    shizukuManager.unfreezeApp(pkg)
+                    val result = shizukuManager.unfreezeApp(pkg)
+                    if (result.isFailure) {
+                        AppLogger.e(TAG, "boot.unfreezeApp failed for package=$pkg", result.exceptionOrNull())
+                    }
                 }
             }
         }
+    }
+
+    private companion object {
+        private const val TAG = "BootReceiver"
     }
 }

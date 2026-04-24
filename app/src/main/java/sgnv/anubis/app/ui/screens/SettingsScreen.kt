@@ -35,6 +35,7 @@ import sgnv.anubis.app.ui.MainViewModel
 fun SettingsScreen(
     viewModel: MainViewModel,
     onOpenRecovery: () -> Unit = {},
+    onOpenJournal: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val shizukuStatus by viewModel.shizukuStatus.collectAsState()
@@ -193,6 +194,35 @@ fun SettingsScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+
+        // Journal entry
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenJournal() }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_journal_title),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        stringResource(R.string.settings_journal_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
 
         // Recovery entry
         Card(

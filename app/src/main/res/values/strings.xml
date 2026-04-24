@@ -27,4 +27,14 @@
 
     <string name="settings_launcher_safe_mode_title">Безопасный режим лаунчера</string>
     <string name="settings_launcher_safe_mode_description">Уменьшает вероятность дубликатов ярлыков: массовая разморозка выполняется по одному приложению с короткой паузой.</string>
+    <string name="settings_journal_title">Журнал</string>
+    <string name="settings_journal_description">Просмотр диагностических логов</string>
+
+    <string name="log_screen_title">Журнал</string>
+    <string name="log_screen_back">Назад</string>
+    <string name="log_screen_clear">Очистить</string>
+    <string name="log_screen_empty">Нет записей</string>
+    <string name="log_screen_clear_confirm_title">Очистить журнал?</string>
+    <string name="log_screen_clear_confirm_message">Все записи журнала будут удалены.</string>
+    <string name="log_screen_clear_confirm_action">Очистить</string>
 </resources>

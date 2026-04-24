@@ -40,7 +40,10 @@ import org.json.JSONObject
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import sgnv.anubis.app.R
+import sgnv.anubis.app.util.AppLogger
 import sgnv.anubis.app.ui.util.renderToBitmap
+
+private const val TAG = "MainViewModel"
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -358,8 +361,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var unfrozenCount = 0
             for (pkg in allManaged) {
                 if (shizukuManager.isAppFrozen(pkg)) {
-                    shizukuManager.unfreezeApp(pkg)
-                    unfrozenCount++
+                    val result = shizukuManager.unfreezeApp(pkg)
+                    if (result.isFailure) {
+                        AppLogger.e(TAG, "unfreezeAllAndClear.unfreezeApp failed for package=$pkg", result.exceptionOrNull())
+                    } else {
+                        unfrozenCount++
+                    }
                 }
                 repository.removeApp(pkg)
             }
@@ -382,8 +389,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             var unfrozenCount = 0
             for (pkg in disabled) {
-                shizukuManager.unfreezeApp(pkg)
-                unfrozenCount++
+                val result = shizukuManager.unfreezeApp(pkg)
+                if (result.isFailure) {
+                    AppLogger.e(TAG, "unfreezeAllUserDisabled.unfreezeApp failed for package=$pkg", result.exceptionOrNull())
+                } else {
+                    unfrozenCount++
+                }
             }
             // Also clear DB so orchestrator state stays consistent
             for (pkg in repository.getAllManagedPackages()) {
