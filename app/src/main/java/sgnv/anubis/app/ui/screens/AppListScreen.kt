@@ -79,6 +79,10 @@ private enum class SortBy(val label: String) {
 @Composable
 fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val allApps by viewModel.installedApps.collectAsState()
+    // Observing this triggers recomposition when any app is frozen/unfrozen externally
+    // (e.g. via the Home screen context menu). Without this, app.isDisabled stays stale
+    // until the next pull-to-refresh — issue #126.
+    val frozenVersion by viewModel.frozenVersion.collectAsState()
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -253,9 +257,16 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             }
         }
 
+        // weight(1f) instead of fillMaxSize: when this Column lives inside a Scaffold slot
+        // with edge-to-edge insets (issue #117 — Poco X7 Pro / HyperOS / Android 15), incoming
+        // height constraints can be Infinity, which makes a fillMaxSize Box collapse to its
+        // intrinsic min height — the LazyColumn ends up looking like a "small scrollable window
+        // inside a bigger scroll area". weight forces the Box to consume the remaining vertical
+        // space in the parent Column deterministically.
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .nestedScroll(pullState.nestedScrollConnection)
         ) {
             LazyColumn(
@@ -275,9 +286,14 @@ fun AppListScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                         )
                     }
                 }
-                items(sortedList, key = { it.packageName }) { app ->
+                items(sortedList, key = { "${it.packageName}_$frozenVersion" }) { app ->
+                    // Live frozen status (issue #126) — viewModel.isAppFrozen() reflects current
+                    // ShizukuManager state, not the cached InstalledAppInfo.isDisabled which only
+                    // refreshes on pull-to-refresh.
+                    val isFrozen = viewModel.isAppFrozen(app.packageName)
                     AppRow(
                         app = app,
+                        isFrozen = isFrozen,
                         isKnownRestricted = DefaultRestrictedApps.isKnownRestricted(app.packageName),
                         onCycleGroup = {
                             if (app.group == null && !prefs.getBoolean("seen_first_add_warning", false)) {
@@ -383,7 +399,12 @@ private fun LegendRow(
 }
 
 @Composable
-private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGroup: () -> Unit) {
+private fun AppRow(
+    app: InstalledAppInfo,
+    isFrozen: Boolean,
+    isKnownRestricted: Boolean,
+    onCycleGroup: () -> Unit,
+) {
     val context = LocalContext.current
     val pm = context.packageManager
 
@@ -419,7 +440,7 @@ private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGro
                     bitmap = iconBitmap,
                     contentDescription = app.label,
                     modifier = Modifier.size(40.dp),
-                    colorFilter = if (app.isDisabled) grayscaleFilter else null
+                    colorFilter = if (isFrozen) grayscaleFilter else null
                 )
                 Spacer(Modifier.width(12.dp))
             }
@@ -430,7 +451,7 @@ private fun AppRow(app: InstalledAppInfo, isKnownRestricted: Boolean, onCycleGro
                         app.label,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = if (app.isDisabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        color = if (isFrozen) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                         else MaterialTheme.colorScheme.onSurface
                     )
                     if (isKnownRestricted) {
