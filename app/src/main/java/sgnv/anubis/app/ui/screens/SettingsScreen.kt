@@ -217,16 +217,16 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.settings_journal_title),
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         stringResource(R.string.settings_journal_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
                     )
                 }
-                Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
             }
         }
 
