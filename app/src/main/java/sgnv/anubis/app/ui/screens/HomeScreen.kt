@@ -255,7 +255,6 @@ fun HomeScreen(
         }
 
         // App groups
-        if (localAutoUnfreezeApps.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             AppGroupSection(
                 title = "Без VPN + уведомления",
@@ -268,9 +267,7 @@ fun HomeScreen(
                 onLongClick = { pkg -> menuApp = pkg },
                 onAdd = { addingToGroup = AppGroup.LOCAL_AUTO_UNFREEZE }
             )
-        }
 
-        if (localApps.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             AppGroupSection(
                 title = "Без VPN",
@@ -283,9 +280,7 @@ fun HomeScreen(
                 onLongClick = { pkg -> menuApp = pkg },
                 onAdd = { addingToGroup = AppGroup.LOCAL }
             )
-        }
 
-        if (launchVpnApps.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             AppGroupSection(
                 title = "Запуск с VPN",
@@ -298,9 +293,7 @@ fun HomeScreen(
                 onLongClick = { pkg -> menuApp = pkg },
                 onAdd = { addingToGroup = AppGroup.LAUNCH_VPN }
             )
-        }
 
-        if (vpnOnlyApps.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             AppGroupSection(
                 title = "Только VPN",
@@ -313,41 +306,6 @@ fun HomeScreen(
                 onLongClick = { pkg -> menuApp = pkg },
                 onAdd = { addingToGroup = AppGroup.VPN_ONLY }
             )
-        }
-
-        if (localApps.isEmpty() && localAutoUnfreezeApps.isEmpty() && vpnOnlyApps.isEmpty() && launchVpnApps.isEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            Text(
-                "Нет приложений в группах. Добавьте хотя бы в одну:",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                EmptyGroupAddButton(
-                    label = "Без VPN + уведомления",
-                    tint = MaterialTheme.colorScheme.secondary,
-                    onClick = { addingToGroup = AppGroup.LOCAL_AUTO_UNFREEZE }
-                )
-                EmptyGroupAddButton(
-                    label = "Без VPN",
-                    tint = MaterialTheme.colorScheme.error,
-                    onClick = { addingToGroup = AppGroup.LOCAL }
-                )
-                EmptyGroupAddButton(
-                    label = "Запуск с VPN",
-                    tint = MaterialTheme.colorScheme.primary,
-                    onClick = { addingToGroup = AppGroup.LAUNCH_VPN }
-                )
-                EmptyGroupAddButton(
-                    label = "Только VPN",
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    onClick = { addingToGroup = AppGroup.VPN_ONLY }
-                )
-            }
-        }
 
         // Network
         Spacer(Modifier.height(16.dp))
@@ -714,27 +672,3 @@ private fun InfoRow(label: String, value: String) {
     }
 }
 
-@Composable
-private fun EmptyGroupAddButton(
-    label: String,
-    tint: Color,
-    onClick: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, tint = tint)
-            Spacer(Modifier.width(12.dp))
-            Text(
-                "Добавить в «$label»",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = tint
-            )
-        }
-    }
-}
