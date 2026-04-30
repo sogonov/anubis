@@ -579,7 +579,7 @@ private fun AppGroupSection(
     }
 
     val rows = (sortedApps.size + 3) / 4
-    val gridHeight = (rows * 88).dp
+    val gridHeight = if (rows == 0) 0.dp else (rows * 88 - 8).dp
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
