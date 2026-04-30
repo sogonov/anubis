@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.IBinder
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.settings.AppSettings
+import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientType
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,9 @@ class StealthWidgetService : Service() {
 
         scope.launch {
             try {
+                if (shizukuManager.status.value != ShizukuStatus.READY) {
+                    return@launch
+                }
                 shizukuManager.awaitUserService()
 
                 val progressJob = launch {

@@ -1,10 +1,12 @@
 package sgnv.anubis.app.service
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.settings.AppSettings
+import sgnv.anubis.app.shizuku.shizukuUnavailableMessageRes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,7 +31,7 @@ class ShortcutActivity : ComponentActivity() {
 
         val data = intent.data
         val isUrlLaunch = data?.scheme == URL_SCHEME
-        val packageName = if (isUrlLaunch) data?.host else intent.getStringExtra("package")
+        val packageName = if (isUrlLaunch) data.host else intent.getStringExtra(EXTRA_PACKAGE)
         if (packageName.isNullOrBlank()) { finish(); return }
 
         val app = applicationContext as AnubisApp
@@ -42,6 +44,12 @@ class ShortcutActivity : ComponentActivity() {
         val client = AppSettings.loadSelectedVpnClient(this)
 
         CoroutineScope(Dispatchers.Main).launch {
+            val unavailableRes = shizukuUnavailableMessageRes(shizukuManager.status.value)
+            if (unavailableRes != null) {
+                Toast.makeText(this@ShortcutActivity, getString(unavailableRes), Toast.LENGTH_SHORT).show()
+                finish()
+                return@launch
+            }
             shizukuManager.awaitUserService()
 
             // Resolve group. Repository is authoritative; extras are a legacy fallback
@@ -51,7 +59,7 @@ class ShortcutActivity : ComponentActivity() {
             val group = when {
                 managedGroup != null -> managedGroup
                 isUrlLaunch -> { finish(); return@launch }
-                else -> intent.getStringExtra("group")
+                else -> intent.getStringExtra(EXTRA_GROUP)
                     ?.let { runCatching { AppGroup.valueOf(it) }.getOrNull() }
                     ?: AppGroup.LAUNCH_VPN
             }
@@ -80,5 +88,7 @@ class ShortcutActivity : ComponentActivity() {
 
     companion object {
         const val URL_SCHEME = "anubis"
+        const val EXTRA_PACKAGE = "package"
+        const val EXTRA_GROUP = "group"
     }
 }

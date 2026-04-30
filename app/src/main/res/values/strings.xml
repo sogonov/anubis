@@ -37,4 +37,34 @@
     <string name="log_screen_clear_confirm_title">Очистить журнал?</string>
     <string name="log_screen_clear_confirm_message">Все записи журнала будут удалены.</string>
     <string name="log_screen_clear_confirm_action">Очистить</string>
+
+    <string name="shizuku_toast_not_installed">Функция недоступна: Shizuku не установлен</string>
+    <string name="shizuku_toast_not_running">Функция недоступна: Shizuku не запущен</string>
+    <string name="shizuku_toast_no_permission">Функция недоступна: нет разрешения Shizuku</string>
+
+    <string name="recovery_title">Восстановление</string>
+    <string name="recovery_back">Назад</string>
+    <string name="recovery_reset_completed">Разморожено приложений: %1$d. Группы очищены.</string>
+    <string name="recovery_intro">Если после использования Anubis с рабочего стола пропали иконки или приложения не открываются — выберите один из сценариев восстановления ниже.\n\nЯрлыки на рабочем столе автоматически не вернутся — это ограничение лаунчеров Android. Приложения будут доступны в системном меню и поиске, оттуда их можно перетащить обратно.</string>
+    <string name="recovery_normal_title">Обычный сброс</string>
+    <string name="recovery_normal_description">Разморозить только те приложения, которые замораживал Anubis, и очистить группы. Безопасный вариант — не трогает то, что вы отключали вручную.</string>
+    <string name="recovery_reset_anubis_button">Сбросить Anubis</string>
+    <string name="recovery_emergency_title">Аварийная разморозка</string>
+    <string name="recovery_emergency_description">Найти и разморозить ВСЕ отключённые пользовательские приложения. Нужно, если вы переустанавливали Anubis и данные о группах утеряны. Внимание: разморозит и те приложения, которые вы отключали вручную через настройки Android.</string>
+    <string name="recovery_unfreeze_all_disabled_button">Разморозить все отключённые</string>
+    <string name="recovery_reset_dialog_title">Сбросить Anubis?</string>
+    <string name="recovery_reset_dialog_text">Все приложения в группах будут разморожены, группы очищены. Anubis перестанет чем-либо управлять до повторной настройки.</string>
+    <string name="recovery_reset_confirm">Сбросить</string>
+    <string name="recovery_unfreeze_disabled_dialog_title">Разморозить все отключённые?</string>
+    <string name="recovery_unfreeze_disabled_dialog_text">Anubis найдёт все отключённые пользовательские приложения на устройстве и разморозит их через Shizuku. Это коснётся и тех приложений, которые вы отключали вручную через настройки Android.\n\nСистемные приложения не затрагиваются.</string>
+    <string name="recovery_unfreeze_all_confirm">Разморозить всё</string>
+    <string name="settings_recovery_description">Разморозить приложения, очистить группы</string>
+    <string name="settings_shizuku_status_label">Статус</string>
+    <string name="settings_shizuku_hint_not_installed">Нажмите, чтобы скачать</string>
+    <string name="settings_shizuku_hint_not_running">Нажмите, чтобы открыть Shizuku</string>
+    <string name="settings_shizuku_hint_no_permission">Нажмите, чтобы выдать разрешение</string>
+    <string name="settings_shizuku_value_ready">Подключён</string>
+    <string name="settings_shizuku_value_no_permission">Нет разрешения</string>
+    <string name="settings_shizuku_value_not_running">Не запущен</string>
+    <string name="settings_shizuku_value_not_installed">Не установлен</string>
 </resources>

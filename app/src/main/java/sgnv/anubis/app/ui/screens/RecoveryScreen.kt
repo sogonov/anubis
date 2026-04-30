@@ -1,5 +1,6 @@
 package sgnv.anubis.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -7,19 +8,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons.AutoMirrored.Filled
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,8 +33,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import sgnv.anubis.app.R
+import sgnv.anubis.app.shizuku.shizukuUnavailableMessageRes
 import sgnv.anubis.app.ui.MainViewModel
 
 @Composable
@@ -38,6 +47,7 @@ fun RecoveryScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val shizukuStatus by viewModel.shizukuStatus.collectAsState()
 
     var showResetDialog by remember { mutableStateOf(false) }
     val dismissResetDialog: () -> Unit = { showResetDialog = false }
@@ -45,12 +55,20 @@ fun RecoveryScreen(
     var showScanDialog by remember { mutableStateOf(false) }
     val dismissScanDialog: () -> Unit = { showScanDialog = false }
 
+    val requireShizukuReady: () -> Boolean = {
+        val messageRes = shizukuUnavailableMessageRes(shizukuStatus)
+        messageRes == null || run {
+            Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+            false
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.resetCompleted.collect { count ->
-            android.widget.Toast.makeText(
+            Toast.makeText(
                 context,
-                "Разморожено приложений: $count. Группы очищены.",
-                android.widget.Toast.LENGTH_LONG
+                context.getString(R.string.recovery_reset_completed, count),
+                Toast.LENGTH_LONG
             ).show()
             onBack()
         }
@@ -64,14 +82,16 @@ fun RecoveryScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) {
-                Text("‹ Назад", style = MaterialTheme.typography.labelLarge)
+                Icon(imageVector = Filled.ArrowBack, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.recovery_back), style = MaterialTheme.typography.labelLarge)
             }
         }
 
         Spacer(Modifier.height(8.dp))
 
         Text(
-            "Восстановление",
+            stringResource(R.string.recovery_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -79,10 +99,7 @@ fun RecoveryScreen(
         Spacer(Modifier.height(8.dp))
 
         Text(
-            "Если после использования Anubis с рабочего стола пропали иконки или приложения не открываются — " +
-            "выберите один из сценариев восстановления ниже.\n\n" +
-            "Ярлыки на рабочем столе автоматически не вернутся — это ограничение лаунчеров Android. " +
-            "Приложения будут доступны в системном меню и поиске, оттуда их можно перетащить обратно.",
+            stringResource(R.string.recovery_intro),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -93,23 +110,25 @@ fun RecoveryScreen(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Обычный сброс",
+                    stringResource(R.string.recovery_normal_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Разморозить только те приложения, которые замораживал Anubis, и очистить группы. " +
-                    "Безопасный вариант — не трогает то, что вы отключали вручную.",
+                    stringResource(R.string.recovery_normal_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
                 Button(
-                    onClick = { showResetDialog = true },
+                    onClick = {
+                        if (!requireShizukuReady()) return@Button
+                        showResetDialog = true
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Сбросить Anubis")
+                    Text(stringResource(R.string.recovery_reset_anubis_button))
                 }
             }
         }
@@ -125,28 +144,29 @@ fun RecoveryScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Аварийная разморозка",
+                    stringResource(R.string.recovery_emergency_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Найти и разморозить ВСЕ отключённые пользовательские приложения. " +
-                    "Нужно, если вы переустанавливали Anubis и данные о группах утеряны. " +
-                    "Внимание: разморозит и те приложения, которые вы отключали вручную через настройки Android.",
+                    stringResource(R.string.recovery_emergency_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(
-                    onClick = { showScanDialog = true },
+                    onClick = {
+                        if (!requireShizukuReady()) return@OutlinedButton
+                        showScanDialog = true
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     )
                 ) {
-                    Text("Разморозить все отключённые")
+                    Text(stringResource(R.string.recovery_unfreeze_all_disabled_button))
                 }
             }
         }
@@ -157,11 +177,10 @@ fun RecoveryScreen(
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = dismissResetDialog,
-            title = { Text("Сбросить Anubis?") },
+            title = { Text(stringResource(R.string.recovery_reset_dialog_title)) },
             text = {
                 Text(
-                    "Все приложения в группах будут разморожены, группы очищены. " +
-                    "Anubis перестанет чем-либо управлять до повторной настройки."
+                    stringResource(R.string.recovery_reset_dialog_text)
                 )
             },
             confirmButton = {
@@ -169,11 +188,11 @@ fun RecoveryScreen(
                     viewModel.unfreezeAllAndClear()
                     dismissResetDialog()
                 }) {
-                    Text("Сбросить", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.recovery_reset_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = dismissResetDialog) { Text("Отмена") }
+                TextButton(onClick = dismissResetDialog) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -181,12 +200,10 @@ fun RecoveryScreen(
     if (showScanDialog) {
         AlertDialog(
             onDismissRequest = dismissScanDialog,
-            title = { Text("Разморозить все отключённые?") },
+            title = { Text(stringResource(R.string.recovery_unfreeze_disabled_dialog_title)) },
             text = {
                 Text(
-                    "Anubis найдёт все отключённые пользовательские приложения на устройстве и разморозит их " +
-                    "через Shizuku. Это коснётся и тех приложений, которые вы отключали вручную через настройки Android.\n\n" +
-                    "Системные приложения не затрагиваются."
+                    stringResource(R.string.recovery_unfreeze_disabled_dialog_text)
                 )
             },
             confirmButton = {
@@ -194,11 +211,11 @@ fun RecoveryScreen(
                     viewModel.unfreezeAllUserDisabled()
                     dismissScanDialog()
                 }) {
-                    Text("Разморозить всё", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.recovery_unfreeze_all_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = dismissScanDialog) { Text("Отмена") }
+                TextButton(onClick = dismissScanDialog) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }

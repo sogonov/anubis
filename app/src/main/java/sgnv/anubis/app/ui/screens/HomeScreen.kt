@@ -63,6 +63,7 @@ import sgnv.anubis.app.data.model.ManagedApp
 import sgnv.anubis.app.service.StealthState
 import sgnv.anubis.app.shizuku.SHIZUKU_PACKAGE
 import sgnv.anubis.app.shizuku.ShizukuStatus
+import sgnv.anubis.app.shizuku.shizukuUnavailableMessageRes
 import sgnv.anubis.app.ui.MainViewModel
 import sgnv.anubis.app.ui.util.renderToImageBitmap
 
@@ -187,7 +188,7 @@ fun HomeScreen(
                             if (vpnIntent != null) { onRequestVpnPermission(vpnIntent); return@Switch }
                             viewModel.toggleStealth()
                         },
-                        enabled = !isTransitioning && shizukuStatus == ShizukuStatus.READY
+                        enabled = true
                     )
                 }
             }
@@ -226,18 +227,16 @@ fun HomeScreen(
 
         if (shizukuStatus != ShizukuStatus.READY) {
             val context = LocalContext.current
+            val shizukuStatusTextRes = shizukuUnavailableMessageRes(shizukuStatus)
             Spacer(Modifier.height(8.dp))
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
                 Column(Modifier.padding(12.dp)) {
-                    Text(
-                        when (shizukuStatus) {
-                            ShizukuStatus.NOT_INSTALLED -> "Shizuku не установлен"
-                            ShizukuStatus.NOT_RUNNING -> "Shizuku не запущен"
-                            ShizukuStatus.NO_PERMISSION -> "Нет разрешения Shizuku"
-                            ShizukuStatus.READY -> "" // unreachable
-                        },
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    shizukuStatusTextRes?.let { textRes ->
+                        Text(
+                            stringResource(textRes),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         when (shizukuStatus) {
                             ShizukuStatus.NOT_INSTALLED -> Button(onClick = {
