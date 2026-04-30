@@ -6,6 +6,7 @@ import android.net.VpnService
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import sgnv.anubis.app.util.AppLogger
 
 /**
  * Dummy VPN service to force-disconnect any active VPN.
@@ -42,7 +43,7 @@ class StealthVpnService : VpnService() {
                 Log.w(TAG, "establish() returned null — no VPN consent")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to establish dummy VPN", e)
+            AppLogger.e(TAG, "Failed to establish dummy VPN", e)
         }
         stopSelf()
     }

@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sgnv.anubis.app.ui.screens.AppListScreen
 import sgnv.anubis.app.ui.screens.HomeScreen
+import sgnv.anubis.app.ui.screens.LogScreen
 import sgnv.anubis.app.ui.screens.RecoveryScreen
 import sgnv.anubis.app.ui.screens.SettingsScreen
 import sgnv.anubis.app.ui.screens.StartupScreen
@@ -61,9 +62,21 @@ class MainActivity : ComponentActivity() {
                 val message by viewModel.message.collectAsState()
                 var selectedTab by rememberSaveable { mutableIntStateOf(0) }
                 var showRecovery by rememberSaveable { mutableStateOf(false) }
+                var showJournal by rememberSaveable { mutableStateOf(false) }
                 val dismissRecovery: () -> Unit = { showRecovery = false }
+                val dismissJournal: () -> Unit = { showJournal = false }
+                val selectTab: (Int) -> Unit = { tab ->
+                    selectedTab = tab
+                    dismissRecovery()
+                    dismissJournal()
+                }
 
-                BackHandler(enabled = showRecovery, onBack = dismissRecovery)
+                BackHandler(enabled = showRecovery || showJournal) {
+                    when {
+                        showJournal -> dismissJournal()
+                        showRecovery -> dismissRecovery()
+                    }
+                }
 
                 if (startupLoading) {
                     StartupScreen(
@@ -75,25 +88,25 @@ class MainActivity : ComponentActivity() {
                             NavigationBar {
                                 NavigationBarItem(
                                     selected = selectedTab == 0,
-                                    onClick = { selectedTab = 0; dismissRecovery() },
+                                    onClick = { selectTab(0) },
                                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
                                     label = { Text("Главная") }
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 1,
-                                    onClick = { selectedTab = 1; dismissRecovery() },
+                                    onClick = { selectTab(1) },
                                     icon = { Icon(Icons.Default.List, contentDescription = null) },
                                     label = { Text("Приложения") }
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 2,
-                                    onClick = { selectedTab = 2; dismissRecovery() },
+                                    onClick = { selectTab(2) },
                                     icon = { Icon(Icons.Default.Lock, contentDescription = null) },
                                     label = { Text("VPN") }
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 3,
-                                    onClick = { selectedTab = 3; dismissRecovery() },
+                                    onClick = { selectTab(3) },
                                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                                     label = { Text("Настройки") }
                                 )
@@ -104,6 +117,11 @@ class MainActivity : ComponentActivity() {
                             RecoveryScreen(
                                 viewModel = viewModel,
                                 onBack = dismissRecovery,
+                                modifier = Modifier.padding(padding)
+                            )
+                        } else if (showJournal) {
+                            LogScreen(
+                                onBack = dismissJournal,
                                 modifier = Modifier.padding(padding)
                             )
                         } else when (selectedTab) {
@@ -120,6 +138,7 @@ class MainActivity : ComponentActivity() {
                             3 -> SettingsScreen(
                                 viewModel = viewModel,
                                 onOpenRecovery = { showRecovery = true },
+                                onOpenJournal = { showJournal = true },
                                 modifier = Modifier.padding(padding)
                             )
                         }

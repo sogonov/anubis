@@ -13,6 +13,7 @@ import sgnv.anubis.app.data.db.AppDatabase
 import sgnv.anubis.app.data.repository.AppRepository
 import sgnv.anubis.app.service.StealthOrchestrator
 import sgnv.anubis.app.shizuku.ShizukuManager
+import sgnv.anubis.app.util.AppLogger
 import sgnv.anubis.app.vpn.VpnClientManager
 
 class AnubisApp : Application() {
@@ -53,8 +54,14 @@ class AnubisApp : Application() {
      */
     val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    @Volatile
+    private var previousUncaughtExceptionHandler: Thread.UncaughtExceptionHandler? = null
+
     override fun onCreate() {
         super.onCreate()
+        AppLogger.init(this)
+        installCrashLoggingHandler()
+        AppLogger.i(TAG, APP_START_LOG_MESSAGE)
 
         // Required on Android 9+ to reflect into @hide IPackageManager / IActivityManager
         // methods used by the binder-based freeze path in ShizukuManager.
@@ -90,7 +97,23 @@ class AnubisApp : Application() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    private fun installCrashLoggingHandler() {
+        if (previousUncaughtExceptionHandler != null) return
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        previousUncaughtExceptionHandler = previous
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            AppLogger.e(
+                TAG,
+                "FATAL: Uncaught exception on thread=${thread.name}",
+                throwable
+            )
+            previous?.uncaughtException(thread, throwable)
+        }
+    }
+
     companion object {
         const val CHANNEL_ID = "anubis_monitor"
+        private const val TAG = "AnubisApp"
+        private const val APP_START_LOG_MESSAGE = "Start"
     }
 }
