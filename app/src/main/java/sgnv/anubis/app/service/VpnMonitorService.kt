@@ -22,7 +22,6 @@ import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.R
 import sgnv.anubis.app.ui.MainActivity
 import sgnv.anubis.app.util.AppLogger
-import java.util.Collections
 
 /**
  * Foreground service that syncs stealth state with real VPN state while the UI is
@@ -39,7 +38,6 @@ class VpnMonitorService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
-    private val activeExternalVpnNetworks = Collections.synchronizedSet(mutableSetOf<Network>())
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -63,7 +61,6 @@ class VpnMonitorService : Service() {
 
         val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         val app = applicationContext as AnubisApp
-        activeExternalVpnNetworks.clear()
 
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
@@ -76,7 +73,6 @@ class VpnMonitorService : Service() {
                 // would re-freeze groups that disable() just unfroze.
                 if (isOwnVpnNetwork(cm, network)) return
                 if (StealthVpnService.dummyVpnInFlight) return
-                activeExternalVpnNetworks.add(network)
                 scope.launch {
                     withTimeoutOrNull(APPLY_STATE_TIMEOUT_MS) {
                         app.orchestrator.freezeOnly()
@@ -88,9 +84,15 @@ class VpnMonitorService : Service() {
             override fun onLost(network: Network) {
                 if (isOwnVpnNetwork(cm, network)) return
                 if (StealthVpnService.dummyVpnInFlight) return
-                activeExternalVpnNetworks.remove(network)
-                val stillActive = synchronized(activeExternalVpnNetworks) {
-                    activeExternalVpnNetworks.isNotEmpty()
+                // Exclude the just-lost network: at the moment onLost is dispatched,
+                // the system may not have removed it from allNetworks yet. Without
+                // this, stillActive sees the dying network and we skip freezeVpnOnly
+                // — state gets stuck at ENABLED after external VPN crashes.
+                val stillActive = cm.allNetworks.any { n ->
+                    if (n == network) return@any false
+                    val caps = cm.getNetworkCapabilities(n) ?: return@any false
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+                        caps.ownerUid != Process.myUid()
                 }
                 if (!stillActive) {
                     scope.launch {
@@ -118,7 +120,6 @@ class VpnMonitorService : Service() {
     }
 
     private fun stopVpnMonitoring() {
-        activeExternalVpnNetworks.clear()
         networkCallback?.let {
             try {
                 val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager

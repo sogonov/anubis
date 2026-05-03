@@ -1,5 +1,7 @@
 package sgnv.anubis.app.service
 
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import sgnv.anubis.app.AnubisApp
@@ -74,8 +76,15 @@ class StealthTileService : TileService() {
     }
 
     private fun isVpnActive(): Boolean {
-        val app = application as AnubisApp
-        return app.vpnClientManager.vpnActive.value
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        return try {
+            cm.allNetworks.any { network ->
+                cm.getNetworkCapabilities(network)
+                    ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     override fun onDestroy() {

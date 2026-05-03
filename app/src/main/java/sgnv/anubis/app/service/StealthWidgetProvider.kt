@@ -6,8 +6,9 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.widget.RemoteViews
-import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.R
 
 class StealthWidgetProvider : AppWidgetProvider() {
@@ -73,8 +74,15 @@ class StealthWidgetProvider : AppWidgetProvider() {
         }
 
         fun isVpnActive(context: Context): Boolean {
-            val app = context.applicationContext as AnubisApp
-            return app.vpnClientManager.vpnActive.value
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            return try {
+                cm.allNetworks.any { network ->
+                    cm.getNetworkCapabilities(network)
+                        ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+                }
+            } catch (e: Exception) {
+                false
+            }
         }
     }
 }
