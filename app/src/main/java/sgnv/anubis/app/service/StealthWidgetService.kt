@@ -35,10 +35,19 @@ class StealthWidgetService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun doToggle() {
-        val willBeActive = !StealthWidgetProvider.isVpnActive(this)
-
         val app = applicationContext as AnubisApp
         val shizukuManager = app.shizukuManager
+
+        // Bail before the optimistic "Замораживаю..." / "Отключаю VPN..." paint —
+        // otherwise the user sees a flash of the working state that immediately
+        // reverts to the real VPN state in the finally block.
+        if (shizukuManager.status.value != ShizukuStatus.READY) {
+            stopSelf()
+            return
+        }
+
+        val willBeActive = !StealthWidgetProvider.isVpnActive(this)
+
         val vpnClientManager = app.vpnClientManager
         val orchestrator = app.orchestrator
 
@@ -55,9 +64,6 @@ class StealthWidgetService : Service() {
 
         scope.launch {
             try {
-                if (shizukuManager.status.value != ShizukuStatus.READY) {
-                    return@launch
-                }
                 shizukuManager.awaitUserService()
 
                 val progressJob = launch {

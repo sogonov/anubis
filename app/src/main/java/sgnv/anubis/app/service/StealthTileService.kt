@@ -28,11 +28,19 @@ class StealthTileService : TileService() {
     override fun onClick() {
         super.onClick()
 
+        val app = application as AnubisApp
+        val shizukuManager = app.shizukuManager
+
+        // Bail before the optimistic tile state change — otherwise the user sees
+        // a flash to "Stealth ON" / "Stealth OFF" that immediately reverts when
+        // the coroutine inside scope.launch hits the same Shizuku check.
+        if (shizukuManager.status.value != ShizukuStatus.READY) {
+            return
+        }
+
         val willBeActive = !isVpnActive()
         updateTile(isActive = willBeActive)
 
-        val app = application as AnubisApp
-        val shizukuManager = app.shizukuManager
         val vpnClientManager = app.vpnClientManager
         val orchestrator = app.orchestrator
 
@@ -41,9 +49,6 @@ class StealthTileService : TileService() {
 
         scope.launch {
             try {
-                if (shizukuManager.status.value != ShizukuStatus.READY) {
-                    return@launch
-                }
                 shizukuManager.awaitUserService()
 
                 withTimeoutOrNull(TOTAL_TOGGLE_TIMEOUT_MS) {
