@@ -39,8 +39,6 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import org.json.JSONObject
 import java.net.URL
-import java.util.concurrent.atomic.AtomicBoolean
-import sgnv.anubis.app.R
 import sgnv.anubis.app.util.AppLogger
 import sgnv.anubis.app.ui.util.renderToBitmap
 
@@ -125,11 +123,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val resetCompleted: SharedFlow<Int> = _resetCompleted
     private val _toastMessages = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val toastMessages: SharedFlow<String> = _toastMessages
-    private val _startupLoading = MutableStateFlow(true)
-    val startupLoading: StateFlow<Boolean> = _startupLoading
-    private val _message = MutableStateFlow("")
-    val message: StateFlow<String> = _message
-    private val startupLoadingFinalized = AtomicBoolean(false)
 
     init {
         // VpnClientManager is started in AnubisApp.onCreate — don't re-register here.
@@ -422,29 +415,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Suspend version for pull-to-refresh: caller awaits completion, then dismisses the spinner. */
     suspend fun refreshInstalledAppsSync() {
-        try {
-            _installedApps.value = repository.getInstalledApps { processed, total, packageName ->
-                if (!startupLoadingFinalized.get()) {
-                    val status = getApplication<Application>().getString(
-                        R.string.startup_status_scanning_progress,
-                        processed,
-                        total
-                    )
-                    _message.value = if (packageName.isBlank()) {
-                        status
-                    } else {
-                        "$status\n$packageName"
-                    }
-                }
-            }
-        } finally {
-            if (startupLoadingFinalized.compareAndSet(false, true)) {
-                _message.value = getApplication<Application>()
-                    .getString(R.string.startup_status_preparing_launch)
-                delay(250)
-                _startupLoading.value = false
-            }
-        }
+        _installedApps.value = repository.getInstalledApps()
     }
 
     fun loadGroupedApps() {

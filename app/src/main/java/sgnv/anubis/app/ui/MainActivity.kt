@@ -34,7 +34,6 @@ import sgnv.anubis.app.ui.screens.HomeScreen
 import sgnv.anubis.app.ui.screens.LogScreen
 import sgnv.anubis.app.ui.screens.RecoveryScreen
 import sgnv.anubis.app.ui.screens.SettingsScreen
-import sgnv.anubis.app.ui.screens.StartupScreen
 import sgnv.anubis.app.ui.screens.VpnClientScreen
 import sgnv.anubis.app.ui.theme.AnubisTheme
 import sgnv.anubis.app.update.UpdateDialog
@@ -63,8 +62,6 @@ class MainActivity : ComponentActivity() {
                 val viewModel: MainViewModel = viewModel()
                 viewModelRef = viewModel
                 val context = LocalContext.current
-                val startupLoading by viewModel.startupLoading.collectAsState()
-                val message by viewModel.message.collectAsState()
                 var selectedTab by rememberSaveable { mutableIntStateOf(0) }
                 var showRecovery by rememberSaveable { mutableStateOf(false) }
                 var showJournal by rememberSaveable { mutableStateOf(false) }
@@ -89,80 +86,74 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                if (startupLoading) {
-                    StartupScreen(
-                        messageText = message
-                    )
-                } else {
-                    Scaffold(
-                        bottomBar = {
-                            NavigationBar {
-                                NavigationBarItem(
-                                    selected = selectedTab == 0,
-                                    onClick = { selectTab(0) },
-                                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                                    label = { Text("Главная") }
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 1,
-                                    onClick = { selectTab(1) },
-                                    icon = { Icon(Icons.Default.List, contentDescription = null) },
-                                    label = { Text("Приложения") }
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 2,
-                                    onClick = { selectTab(2) },
-                                    icon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                                    label = { Text("VPN") }
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 3,
-                                    onClick = { selectTab(3) },
-                                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                                    label = { Text("Настройки") }
-                                )
-                            }
-                        }
-                    ) { padding ->
-                        if (showRecovery) {
-                            RecoveryScreen(
-                                viewModel = viewModel,
-                                onBack = dismissRecovery,
-                                modifier = Modifier.padding(padding)
+                Scaffold(
+                    bottomBar = {
+                        NavigationBar {
+                            NavigationBarItem(
+                                selected = selectedTab == 0,
+                                onClick = { selectTab(0) },
+                                icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                                label = { Text("Главная") }
                             )
-                        } else if (showJournal) {
-                            LogScreen(
-                                onBack = dismissJournal,
-                                modifier = Modifier.padding(padding)
+                            NavigationBarItem(
+                                selected = selectedTab == 1,
+                                onClick = { selectTab(1) },
+                                icon = { Icon(Icons.Default.List, contentDescription = null) },
+                                label = { Text("Приложения") }
                             )
-                        } else when (selectedTab) {
-                            0 -> HomeScreen(
-                                viewModel = viewModel,
-                                onRequestVpnPermission = { intent ->
-                                    vpnPermissionLauncher.launch(intent)
-                                },
-                                onOpenRecovery = { showRecovery = true },
-                                modifier = Modifier.padding(padding)
+                            NavigationBarItem(
+                                selected = selectedTab == 2,
+                                onClick = { selectTab(2) },
+                                icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                                label = { Text("VPN") }
                             )
-                            1 -> AppListScreen(viewModel, Modifier.padding(padding))
-                            2 -> VpnClientScreen(viewModel, Modifier.padding(padding))
-                            3 -> SettingsScreen(
-                                viewModel = viewModel,
-                                onOpenRecovery = { showRecovery = true },
-                                onOpenJournal = { showJournal = true },
-                                modifier = Modifier.padding(padding)
+                            NavigationBarItem(
+                                selected = selectedTab == 3,
+                                onClick = { selectTab(3) },
+                                icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                label = { Text("Настройки") }
                             )
                         }
+                    }
+                ) { padding ->
+                    if (showRecovery) {
+                        RecoveryScreen(
+                            viewModel = viewModel,
+                            onBack = dismissRecovery,
+                            modifier = Modifier.padding(padding)
+                        )
+                    } else if (showJournal) {
+                        LogScreen(
+                            onBack = dismissJournal,
+                            modifier = Modifier.padding(padding)
+                        )
+                    } else when (selectedTab) {
+                        0 -> HomeScreen(
+                            viewModel = viewModel,
+                            onRequestVpnPermission = { intent ->
+                                vpnPermissionLauncher.launch(intent)
+                            },
+                            onOpenRecovery = { showRecovery = true },
+                            modifier = Modifier.padding(padding)
+                        )
+                        1 -> AppListScreen(viewModel, Modifier.padding(padding))
+                        2 -> VpnClientScreen(viewModel, Modifier.padding(padding))
+                        3 -> SettingsScreen(
+                            viewModel = viewModel,
+                            onOpenRecovery = { showRecovery = true },
+                            onOpenJournal = { showJournal = true },
+                            modifier = Modifier.padding(padding)
+                        )
+                    }
 
-                        val updateInfo by viewModel.updateInfo.collectAsState()
-                        updateInfo?.let { info ->
-                            if (info.isUpdateAvailable) {
-                                UpdateDialog(
-                                    info = info,
-                                    onDismiss = { viewModel.dismissUpdateDialog() },
-                                    onSkip = { viewModel.skipCurrentUpdate() },
-                                )
-                            }
+                    val updateInfo by viewModel.updateInfo.collectAsState()
+                    updateInfo?.let { info ->
+                        if (info.isUpdateAvailable) {
+                            UpdateDialog(
+                                info = info,
+                                onDismiss = { viewModel.dismissUpdateDialog() },
+                                onSkip = { viewModel.skipCurrentUpdate() },
+                            )
                         }
                     }
                 }

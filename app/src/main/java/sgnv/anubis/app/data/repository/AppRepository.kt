@@ -58,18 +58,17 @@ class AppRepository(
         return toSelect.size
     }
 
-    suspend fun getInstalledApps(
-        onProgress: ((processed: Int, total: Int, packageName: String) -> Unit)? = null
-    ): List<InstalledAppInfo> = withContext(Dispatchers.IO) {
+    suspend fun getInstalledApps(): List<InstalledAppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val apps = pm.getInstalledApplications(
             PackageManager.GET_META_DATA or PackageManager.MATCH_DISABLED_COMPONENTS
         )
 
+        // Single batch read instead of N point queries — meaningful for users with
+        // many installed apps. Independent of the startup-splash logic.
         val managedByPackage = dao.getAll().associateBy { it.packageName }
 
-        val totalApps = apps.size
-        val mapped = apps.mapIndexed { index, appInfo ->
+        apps.map { appInfo ->
             val label = try {
                 appInfo.loadLabel(pm).toString()
             } catch (e: Exception) {
@@ -77,25 +76,14 @@ class AppRepository(
             }
             val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
             val managed = managedByPackage[appInfo.packageName]
-            val info = InstalledAppInfo(
+            InstalledAppInfo(
                 packageName = appInfo.packageName,
                 label = label,
                 isSystem = isSystem,
                 group = managed?.group,
                 isDisabled = !appInfo.enabled
             )
-            val processed = index + 1
-            if (
-                onProgress != null &&
-                (processed == 1 || processed % STARTUP_PROGRESS_STEP == 0 || processed == totalApps)
-            ) {
-                onProgress(processed, totalApps, appInfo.packageName)
-            }
-            info
-        }
-
-        val sorted = mapped.sortedBy { it.label.lowercase() }
-        sorted
+        }.sortedBy { it.label.lowercase() }
     }
 
     private suspend fun getInstalledPackageNames(): Set<String> = withContext(Dispatchers.IO) {
@@ -103,9 +91,5 @@ class AppRepository(
             .getInstalledApplications(PackageManager.MATCH_DISABLED_COMPONENTS)
             .map { it.packageName }
             .toSet()
-    }
-
-    private companion object {
-        private const val STARTUP_PROGRESS_STEP = 12
     }
 }
