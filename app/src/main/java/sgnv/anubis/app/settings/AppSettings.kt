@@ -2,7 +2,6 @@ package sgnv.anubis.app.settings
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.os.Build
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -21,12 +20,6 @@ object AppSettings {
     const val KEY_LAUNCHER_SAFE_MODE = "launcher_safe_mode"
     private const val KEY_VPN_CLIENT_AUTOMATION_TOKEN_PREFIX = "vpn_client_automation_token_"
     private const val TAG = "AppSettings"
-
-    private val LAUNCHER_SAFE_MODE_OEM_HINTS = listOf(
-        "xiaomi",
-        "redmi",
-        "poco",
-    )
 
     @Volatile
     private var securePrefsCache: SharedPreferences? = null
@@ -77,20 +70,9 @@ object AppSettings {
         return prefs(context).getBoolean(KEY_UNFREEZE_ON_VPN_TOGGLE, false)
     }
 
-    /**
-     * Slow down mass-unfreeze to reduce launcher duplicate shortcuts.
-     * Enabled by default on Xiaomi/Redmi/POCO where the issue is frequent.
-     */
+    /** Slow down mass-unfreeze to reduce launcher duplicate shortcuts on misbehaving OEM launchers. */
     fun shouldUseLauncherSafeMode(context: Context): Boolean {
-        return prefs(context).getBoolean(KEY_LAUNCHER_SAFE_MODE, launcherSafeModeDefault())
-    }
-
-    private fun launcherSafeModeDefault(): Boolean {
-        val brand = Build.BRAND.orEmpty().lowercase()
-        val manufacturer = Build.MANUFACTURER.orEmpty().lowercase()
-        return LAUNCHER_SAFE_MODE_OEM_HINTS.any { hint ->
-            brand.contains(hint) || manufacturer.contains(hint)
-        }
+        return prefs(context).getBoolean(KEY_LAUNCHER_SAFE_MODE, false)
     }
 
     fun getVpnClientAutomationToken(context: Context, packageName: String): String? {
