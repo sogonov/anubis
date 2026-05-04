@@ -20,6 +20,7 @@ Unlike sandbox-based solutions (Island, Insular, Shelter), which only isolate ap
 - **Network check** — ping, country, city (IP hidden by default for privacy)
 - **Quick Settings tile** — toggle from notification shade
 - **Auto-freeze on boot** and on app launch if VPN is already active
+- **Background VPN monitoring** — auto-freeze when VPN is toggled outside Anubis (opt-in in Settings)
 - **VPN disconnect** — multi-step: API → dummy VPN takeover → force-stop → kill
 
 ## How It Works
@@ -34,10 +35,10 @@ Uses Shizuku to execute `pm disable-user --user 0 <package>` which completely di
 This is fundamentally different from sandboxing, which still allows the app to run and inspect the network stack.
 
 ### VPN Start
-For clients with known API, sends shell commands via Shizuku:
-- **SEPARATE** (NekoBox): `am start` to exported QuickEnable/QuickDisable activities
-- **TOGGLE** (v2rayNG, Happ, v2rayTun, V2Box): `am broadcast` to widget receiver
-- **MANUAL** (any other client): opens the app, user connects manually
+For clients with a known API, Anubis sends shell commands via Shizuku. Three control modes:
+- **SEPARATE** — independent start and stop commands. Examples: NekoBox (`QuickEnableShortcut` / `QuickDisableShortcut` activities), Incy (`CONNECT` / `DISCONNECT` broadcasts), Clash Meta (`START_CLASH` / `STOP_CLASH` activity).
+- **TOGGLE** — single command that toggles on/off. Examples: v2rayNG / Happ / v2rayTun / V2Box / olcng (widget broadcast), Exclave / husi (`QuickToggleShortcut` activity).
+- **MANUAL** — no external start/stop API. Anubis opens the app and the user taps connect.
 
 ### VPN Stop
 Toggle commands are unreliable for stopping (can re-enable immediately), so Anubis uses a multi-step approach:
@@ -52,15 +53,41 @@ Extracts the VPN network owner UID from `dumpsys connectivity` by matching `type
 
 ## Supported VPN Clients
 
-| Client | Package | Control | Method |
-|--------|---------|---------|--------|
-| v2rayNG | `com.v2ray.ang` | Auto (toggle) | Widget broadcast |
-| NekoBox | `moe.nb4a` | Full (start/stop) | Exported activities |
-| Happ | `com.happproxy` | Auto (toggle) | Widget broadcast |
-| v2rayTun | `com.v2raytun.android` | Auto (toggle) | Widget broadcast |
-| V2Box | `dev.hexasoftware.v2box` | Auto (toggle) | Widget broadcast |
+Variants of the same brand (e.g. v2rayNG Play and F-Droid) are grouped together in the Settings picker.
+
+### Full control (independent start/stop)
+
+| Client | Package(s) | Method |
+|--------|------------|--------|
+| NekoBox | `moe.nb4a` | `QuickEnableShortcut` / `QuickDisableShortcut` activities |
+| Incy | `llc.itdev.incy` | `CONNECT` / `DISCONNECT` broadcasts |
+| Clash Meta | `com.github.metacubex.clash.meta` (Meta), `com.github.metacubex.clash.alpha` (Alpha) | `START_CLASH` / `STOP_CLASH` on `ExternalControlActivity` |
+
+
+### Auto-toggle (start via widget/shortcut, stop via dummy-VPN fallback)
+
+| Client | Package(s) | Method |
+|--------|------------|--------|
+| v2rayNG | `com.v2ray.ang` (Play), `com.v2ray.ang.fdroid` (F-Droid) | Widget broadcast |
+| Happ | `com.happproxy` (Play), `su.happ.proxyutility` (Github) | Widget broadcast |
+| v2rayTun | `com.v2raytun.android` | Widget broadcast |
+| V2Box | `dev.hexasoftware.v2box` | Widget broadcast |
+| olcng | `xyz.zarazaex.olc`, `xyz.zarazaex.olc.fdroid` | Widget broadcast |
+| Exclave | `com.github.dyhkwong.sagernet` | `QuickToggleShortcut` activity |
+| husi | `fr.husi` | `QuickToggleShortcut` activity |
 | [Tunguska](https://github.com/Acionyx/tunguska) | `io.acionyx.tunguska` | Full (start/stop) | Token-gated exported activity |
-| **Any app** | — | Manual | Select in Settings → "Other client" |
+
+### Manual (Anubis opens the app, user connects)
+
+| Client | Package | Why manual |
+|--------|---------|------------|
+| AmneziaVPN | `org.amnezia.vpn` | No exported start/stop API (Qt app) |
+| AmneziaWG | `org.amnezia.awg` | `SET_TUNNEL_UP`/`DOWN` requires a tunnel-name extra — planned for a later release |
+| WireGuard | `com.wireguard.android` | Same mechanism as AmneziaWG |
+| WG Tunnel | `com.zaneschepke.wireguardautotunnel` | `RemoteControlReceiver` is gated by a user-defined secret key |
+| TeapodStream | `com.teapodstream.teapodstream` | Only `MainActivity` exported |
+| Karing | `com.nebula.karing` | Only `MainActivity` + QS tile exported |
+| **Any app** | — | Select in Settings → "Other client" |
 
 ### Tunguska
 
@@ -83,18 +110,27 @@ For closed-source clients, broadcast actions can be discovered via APK analysis 
 3. **Receiver code** → find `setAction("...")` → this is the broadcast action
 4. **Verify** → check `onReceive()` for the `isRunning ? stop : start` toggle pattern
 
-All v2ray/xray forks share the same pattern:
+Two common patterns discovered so far:
+
+**v2ray/xray forks** (v2rayNG, Happ, V2Box, v2rayTun, olcng) — widget broadcast:
 ```
 Action:   <package>.action.widget.click
 Receiver: <package>.receiver.WidgetProvider
 ```
-
-Shell command to toggle:
 ```shell
 am broadcast -a <package>.action.widget.click -n <package>/.receiver.WidgetProvider
 ```
 
-This is standard Android IPC discovery, not reverse engineering of protected code. Broadcast actions are public interfaces by design.
+**SagerNet forks** (NekoBox, Exclave, husi) — exported shortcut activities:
+```
+Activity: QuickEnableShortcut / QuickDisableShortcut (separate)
+     or:  QuickToggleShortcut (single toggle)
+```
+```shell
+am start -n <package>/<activity-fully-qualified-name>
+```
+
+This is standard Android IPC discovery, not reverse engineering of protected code. Broadcast actions and exported activities are public interfaces by design.
 
 ## Requirements
 
@@ -137,10 +173,11 @@ keyPassword=your_password
 
 ## Roadmap
 
-- [ ] Background VPN monitoring service (optional, for auto-freeze when VPN is toggled outside Anubis)
+- [ ] Per-client tunnel-name / secret-key config so WireGuard, AmneziaWG and WG Tunnel can move from MANUAL to full control
+- [ ] Fourth app group with auto-unfreeze when VPN is turned off (banking / messenger notifications)
 - [ ] Self-hosted `app_process` daemon to remove Shizuku dependency
 - [ ] Export/import app group configuration
-- [ ] Additional VPN clients (WireGuard, sing-box, etc.)
+- [ ] More VPN clients — PRs welcome, see "Discovering VPN Client APIs" above
 
 ## License
 
