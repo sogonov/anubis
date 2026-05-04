@@ -84,6 +84,15 @@
         </receiver>
 
         <receiver
+            android:name=".service.PackageRemovedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".service.StealthWidgetProvider"
             android:exported="true">
             <intent-filter>
