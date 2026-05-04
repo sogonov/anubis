@@ -14,6 +14,8 @@ enum class VpnClientType(
     INCY("Incy", "llc.itdev.incy"),
     CLASH_META("Meta", "com.github.metacubex.clash.meta", brand = "Clash Meta"),
     CLASH_META_ALPHA("Alpha", "com.github.metacubex.clash.alpha", brand = "Clash Meta"),
+    FLCLASH("FlClash", "com.follow.clash"),
+    FLCLASHX("FlClashX", "com.follow.clashx"),
     HAPP("Play", "com.happproxy", brand = "Happ"),
     HAPP_GITHUB("Github", "su.happ.proxyutility", brand = "Happ"),
     V2RAY_TUN("v2rayTun", "com.v2raytun.android"),
@@ -215,6 +217,41 @@ object VpnClientControls {
                 "am", "start",
                 "-a", "com.github.metacubex.clash.alpha.action.STOP_CLASH",
                 "-n", "com.github.metacubex.clash.alpha/com.github.kr328.clash.ExternalControlActivity"
+            ),
+        ),
+
+        // FlClash (Flutter): TempActivity is exported with no permission and no caller check,
+        // routes intent.action straight into State.handleStart/Stop. Action prefix follows
+        // applicationId — same pattern as Clash Meta.
+        VpnClientType.FLCLASH to VpnClientControl(
+            clientType = VpnClientType.FLCLASH,
+            mode = VpnControlMode.SEPARATE,
+            startCommand = arrayOf(
+                "am", "start",
+                "-a", "com.follow.clash.action.START",
+                "-n", "com.follow.clash/com.follow.clash.TempActivity"
+            ),
+            stopCommand = arrayOf(
+                "am", "start",
+                "-a", "com.follow.clash.action.STOP",
+                "-n", "com.follow.clash/com.follow.clash.TempActivity"
+            ),
+        ),
+
+        // FlClashX: extended fork with a different applicationId. Same TempActivity pattern;
+        // toggle action is named CHANGE instead of TOGGLE, but SEPARATE mode only needs START/STOP.
+        VpnClientType.FLCLASHX to VpnClientControl(
+            clientType = VpnClientType.FLCLASHX,
+            mode = VpnControlMode.SEPARATE,
+            startCommand = arrayOf(
+                "am", "start",
+                "-a", "com.follow.clashx.action.START",
+                "-n", "com.follow.clashx/com.follow.clashx.TempActivity"
+            ),
+            stopCommand = arrayOf(
+                "am", "start",
+                "-a", "com.follow.clashx.action.STOP",
+                "-n", "com.follow.clashx/com.follow.clashx.TempActivity"
             ),
         ),
 

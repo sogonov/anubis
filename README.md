@@ -62,7 +62,8 @@ Variants of the same brand (e.g. v2rayNG Play and F-Droid) are grouped together 
 | NekoBox | `moe.nb4a` | `QuickEnableShortcut` / `QuickDisableShortcut` activities |
 | Incy | `llc.itdev.incy` | `CONNECT` / `DISCONNECT` broadcasts |
 | Clash Meta | `com.github.metacubex.clash.meta` (Meta), `com.github.metacubex.clash.alpha` (Alpha) | `START_CLASH` / `STOP_CLASH` on `ExternalControlActivity` |
-
+| FlClash | `com.follow.clash` | `action.START` / `action.STOP` on `TempActivity` |
+| FlClashX | `com.follow.clashx` | `action.START` / `action.STOP` on `TempActivity` |
 
 ### Auto-toggle (start via widget/shortcut, stop via dummy-VPN fallback)
 
