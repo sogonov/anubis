@@ -379,6 +379,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(12.dp))
 
                 val updateCheckEnabled by viewModel.updateCheckEnabled.collectAsState()
+                val updateIncludePrereleases by viewModel.updateIncludePrereleases.collectAsState()
                 val updateCheckInProgress by viewModel.updateCheckInProgress.collectAsState()
                 val updateInfo by viewModel.updateInfo.collectAsState()
 
@@ -399,6 +400,28 @@ fun SettingsScreen(
                         checked = updateCheckEnabled,
                         onCheckedChange = { viewModel.setUpdateCheckEnabled(it) }
                     )
+                }
+
+                if (updateCheckEnabled) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Включая бета-версии", style = typography.bodyMedium)
+                            Text(
+                                "Получать уведомления о pre-release сборках",
+                                style = typography.bodySmall,
+                                color = colorScheme.onSurfaceVariant
+                            )
+                        }
+                        androidx.compose.material3.Switch(
+                            checked = updateIncludePrereleases,
+                            onCheckedChange = { viewModel.setUpdateIncludePrereleases(it) }
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(8.dp))

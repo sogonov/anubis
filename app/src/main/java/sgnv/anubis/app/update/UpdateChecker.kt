@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import sgnv.anubis.app.BuildConfig
 import java.net.HttpURLConnection
@@ -12,14 +13,17 @@ import java.net.URL
 /**
  * Проверяет наличие новой версии через GitHub Releases API.
  *
- * API: https://api.github.com/repos/<owner>/<repo>/releases/latest
+ * Stable-only: https://api.github.com/repos/<owner>/<repo>/releases/latest
+ * Включая бета: https://api.github.com/repos/<owner>/<repo>/releases?per_page=5 (берём первый)
  * Лимит без токена: 60 req/hour/IP. Для нашего масштаба достаточно.
  */
 object UpdateChecker {
 
-    private const val API_URL = "https://api.github.com/repos/sogonov/anubis/releases/latest"
+    private const val API_LATEST_URL = "https://api.github.com/repos/sogonov/anubis/releases/latest"
+    private const val API_LIST_URL = "https://api.github.com/repos/sogonov/anubis/releases?per_page=5"
     private const val PREFS = "settings"
     private const val KEY_ENABLED = "update_check_enabled"
+    private const val KEY_INCLUDE_PRERELEASES = "update_include_prereleases"
     private const val KEY_LAST_CHECK_MS = "update_last_check_ms"
     private const val KEY_SKIPPED_VERSION = "update_skipped_version"
 
@@ -31,6 +35,15 @@ object UpdateChecker {
     fun setEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit {putBoolean(KEY_ENABLED, enabled)}
+    }
+
+    fun isIncludePrereleases(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_INCLUDE_PRERELEASES, false)
+
+    fun setIncludePrereleases(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit { putBoolean(KEY_INCLUDE_PRERELEASES, enabled) }
     }
 
     fun skipVersion(context: Context, version: String) {
@@ -56,8 +69,11 @@ object UpdateChecker {
             return@withContext null
         }
 
+        val includePrereleases = isIncludePrereleases(context)
+        val apiUrl = if (includePrereleases) API_LIST_URL else API_LATEST_URL
+
         try {
-            val conn = (URL(API_URL).openConnection() as HttpURLConnection).apply {
+            val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 setRequestProperty("Accept", "application/vnd.github+json")
                 setRequestProperty("User-Agent", "Anubis/${BuildConfig.VERSION_NAME}")
@@ -68,12 +84,18 @@ object UpdateChecker {
             if (code !in 200..299) return@withContext null
 
             val body = conn.inputStream.bufferedReader().use { it.readText() }
-            val json = JSONObject(body)
+            // /releases/latest returns a single object; /releases returns an array sorted
+            // by created_at desc — first element is the most recent regardless of prerelease.
+            val release = if (includePrereleases) {
+                JSONArray(body).takeIf { it.length() > 0 }?.getJSONObject(0)
+            } else {
+                JSONObject(body)
+            } ?: return@withContext null
 
-            val tagName = json.optString("tag_name").trimStart('v')
-            val htmlUrl = json.optString("html_url")
-            val notes = json.optString("body").take(2000)
-            val apkUrl = json.optJSONArray("assets")?.let { assets ->
+            val tagName = release.optString("tag_name").trimStart('v')
+            val htmlUrl = release.optString("html_url")
+            val notes = release.optString("body").take(2000)
+            val apkUrl = release.optJSONArray("assets")?.let { assets ->
                 var found: String? = null
                 for (i in 0 until assets.length()) {
                     val a = assets.getJSONObject(i)

@@ -121,6 +121,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateCheckEnabled = MutableStateFlow(true)
     val updateCheckEnabled: StateFlow<Boolean> = _updateCheckEnabled
 
+    private val _updateIncludePrereleases = MutableStateFlow(false)
+    val updateIncludePrereleases: StateFlow<Boolean> = _updateIncludePrereleases
+
     private val _updateCheckInProgress = MutableStateFlow(false)
     val updateCheckInProgress: StateFlow<Boolean> = _updateCheckInProgress
 
@@ -619,11 +622,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     private fun loadUpdateCheckPref() {
         _updateCheckEnabled.value = UpdateChecker.isEnabled(getApplication())
+        _updateIncludePrereleases.value = UpdateChecker.isIncludePrereleases(getApplication())
     }
 
     fun setUpdateCheckEnabled(enabled: Boolean) {
         _updateCheckEnabled.value = enabled
         UpdateChecker.setEnabled(getApplication(), enabled)
+    }
+
+    fun setUpdateIncludePrereleases(enabled: Boolean) {
+        _updateIncludePrereleases.value = enabled
+        UpdateChecker.setIncludePrereleases(getApplication(), enabled)
     }
 
     private fun autoCheckForUpdates() {
