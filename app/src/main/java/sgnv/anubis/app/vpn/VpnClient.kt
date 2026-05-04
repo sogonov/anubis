@@ -223,16 +223,27 @@ object VpnClientControls {
         // FlClash (Flutter): TempActivity is exported with no permission and no caller check,
         // routes intent.action straight into State.handleStart/Stop. Action prefix follows
         // applicationId — same pattern as Clash Meta.
+        //
+        // multiple-task + no-history + no-animation: without these, am start joins FlClash's
+        // existing task (where MainActivity is sitting), so once TempActivity finishes the
+        // user lands on FlClash's main UI. With these flags TempActivity runs in its own
+        // self-destructing task and the user returns to whatever was foreground before.
         VpnClientType.FLCLASH to VpnClientControl(
             clientType = VpnClientType.FLCLASH,
             mode = VpnControlMode.SEPARATE,
             startCommand = arrayOf(
                 "am", "start",
+                "--activity-multiple-task",
+                "--activity-no-history",
+                "--activity-no-animation",
                 "-a", "com.follow.clash.action.START",
                 "-n", "com.follow.clash/com.follow.clash.TempActivity"
             ),
             stopCommand = arrayOf(
                 "am", "start",
+                "--activity-multiple-task",
+                "--activity-no-history",
+                "--activity-no-animation",
                 "-a", "com.follow.clash.action.STOP",
                 "-n", "com.follow.clash/com.follow.clash.TempActivity"
             ),
@@ -245,11 +256,17 @@ object VpnClientControls {
             mode = VpnControlMode.SEPARATE,
             startCommand = arrayOf(
                 "am", "start",
+                "--activity-multiple-task",
+                "--activity-no-history",
+                "--activity-no-animation",
                 "-a", "com.follow.clashx.action.START",
                 "-n", "com.follow.clashx/com.follow.clashx.TempActivity"
             ),
             stopCommand = arrayOf(
                 "am", "start",
+                "--activity-multiple-task",
+                "--activity-no-history",
+                "--activity-no-animation",
                 "-a", "com.follow.clashx.action.STOP",
                 "-n", "com.follow.clashx/com.follow.clashx.TempActivity"
             ),
@@ -401,6 +418,11 @@ object VpnClientControls {
             mode = VpnControlMode.MANUAL,
         ),
 
+        // Tailscale (com.tailscale.ipn): IPNReceiver advertises CONNECT_VPN/DISCONNECT_VPN
+        // with no permission and no caller check, but StartVPNWorker.setExpedited() fires
+        // without overriding getForegroundInfo() — workers crash with IllegalStateException
+        // on devices that grant expedited quota. Not wired here; users select Tailscale
+        // via "Other client" until upstream fix lands.
 
         // Karing (Flutter): only MainActivity + TileService exported — no broadcast/activity
         // API surface for external start/stop. MANUAL.
