@@ -1,6 +1,9 @@
 package sgnv.anubis.app.ui.screens
 
 import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
@@ -20,6 +24,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,9 +35,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import sgnv.anubis.app.R
+import sgnv.anubis.app.data.backup.ImportMode
 import sgnv.anubis.app.shizuku.SHIZUKU_PACKAGE
 import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.ui.MainViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -228,6 +239,98 @@ fun SettingsScreen(
                 }
                 Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
             }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Backup / restore — issue #131. Tunguska automation tokens are intentionally
+        // excluded from export so the JSON file is safe to share or store unencrypted.
+        var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+
+        val exportLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json")
+        ) { uri -> uri?.let { viewModel.exportConfig(it) } }
+
+        val importLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri -> if (uri != null) pendingImportUri = uri }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    val date = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                    exportLauncher.launch("anubis-config-$date.json")
+                }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Экспорт настроек", style = typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        "Сохранить группы и настройки в JSON-файл",
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
+                    )
+                }
+                Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { importLauncher.launch(arrayOf("application/json")) }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Импорт настроек", style = typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        "Восстановить группы и настройки из файла",
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
+                    )
+                }
+                Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
+            }
+        }
+
+        pendingImportUri?.let { uri ->
+            AlertDialog(
+                onDismissRequest = { pendingImportUri = null },
+                title = { Text("Импорт настроек") },
+                text = {
+                    Text(
+                        "«Заменить» очистит текущие группы и применит импортируемую конфигурацию. " +
+                            "«Объединить» добавит из файла только те приложения, которых ещё нет в группах. " +
+                            "Настройки в обоих режимах применяются из файла."
+                    )
+                },
+                confirmButton = {
+                    Row {
+                        TextButton(onClick = {
+                            viewModel.importConfig(uri, ImportMode.MERGE)
+                            pendingImportUri = null
+                        }) { Text("Объединить") }
+                        TextButton(onClick = {
+                            viewModel.importConfig(uri, ImportMode.REPLACE)
+                            pendingImportUri = null
+                        }) { Text("Заменить") }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingImportUri = null }) { Text("Отмена") }
+                }
+            )
         }
 
         Spacer(Modifier.height(12.dp))

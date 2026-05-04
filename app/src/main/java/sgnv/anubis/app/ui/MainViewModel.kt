@@ -2,9 +2,13 @@ package sgnv.anubis.app.ui
 
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import sgnv.anubis.app.AnubisApp
+import sgnv.anubis.app.BuildConfig
+import sgnv.anubis.app.data.backup.BackupRepository
+import sgnv.anubis.app.data.backup.ImportMode
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.model.InstalledAppInfo
 import sgnv.anubis.app.data.model.ManagedApp
@@ -51,6 +55,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val vpnClientManager = app.vpnClientManager
     private val repository = app.appRepository
     private val orchestrator = app.orchestrator
+    private val backupRepository = BackupRepository(application, repository)
 
     val stealthState: StateFlow<StealthState> = orchestrator.state
     val lastError: StateFlow<String?> = orchestrator.lastError
@@ -660,6 +665,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val messageRes = shizukuUnavailableMessageRes(status) ?: return true
         _toastMessages.tryEmit(getApplication<Application>().getString(messageRes))
         return false
+    }
+
+    fun exportConfig(uri: Uri) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            try {
+                val json = backupRepository.export(BuildConfig.VERSION_NAME)
+                withContext(Dispatchers.IO) {
+                    val out = app.contentResolver.openOutputStream(uri)
+                        ?: throw IllegalStateException("Не удалось открыть файл для записи")
+                    out.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                }
+                _toastMessages.tryEmit("Конфигурация экспортирована")
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "exportConfig failed", e)
+                _toastMessages.tryEmit("Ошибка экспорта: ${e.message ?: "неизвестно"}")
+            }
+        }
+    }
+
+    fun importConfig(uri: Uri, mode: ImportMode) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val json = try {
+                withContext(Dispatchers.IO) {
+                    val input = app.contentResolver.openInputStream(uri)
+                        ?: throw IllegalStateException("Не удалось открыть файл для чтения")
+                    input.use { it.bufferedReader(Charsets.UTF_8).readText() }
+                }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "importConfig read failed", e)
+                _toastMessages.tryEmit("Ошибка чтения файла: ${e.message ?: "неизвестно"}")
+                return@launch
+            }
+
+            backupRepository.import(json, mode)
+                .onSuccess { result ->
+                    _toastMessages.tryEmit(
+                        "Импортировано: ${result.totalAppsAdded} приложений, ${result.settingsApplied} настроек"
+                    )
+                    result.warnings.forEach { _toastMessages.tryEmit(it) }
+
+                    // Reload UI state. BG monitoring goes through setBackgroundMonitoring
+                    // (not loadBackgroundMonitoring) because the latter only starts the
+                    // service on true and never stops it on false — which would leave a
+                    // service running after importing a config with monitoring disabled.
+                    val prefs = AppSettings.prefs(app)
+                    setBackgroundMonitoring(prefs.getBoolean(AppSettings.KEY_BACKGROUND_MONITORING, false))
+
+                    loadInstalledApps()
+                    loadGroupedApps()
+                    loadUnfreezeManagedAppsOnVpnToggle()
+                    loadLauncherSafeMode()
+                    loadSelectedClient()
+                }
+                .onFailure { error ->
+                    AppLogger.e(TAG, "importConfig parse failed", error)
+                    _toastMessages.tryEmit("Ошибка импорта: ${error.message ?: "формат не распознан"}")
+                }
+        }
     }
 }
 
