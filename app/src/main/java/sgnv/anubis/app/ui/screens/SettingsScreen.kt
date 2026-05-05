@@ -13,10 +13,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
@@ -51,7 +55,6 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val shizukuStatus by viewModel.shizukuStatus.collectAsState()
-    val unfreezeManagedAppsOnVpnToggle by viewModel.unfreezeManagedAppsOnVpnToggle.collectAsState()
     val launcherSafeMode by viewModel.launcherSafeMode.collectAsState()
 
     Column(
@@ -87,45 +90,6 @@ fun SettingsScreen(
                 androidx.compose.material3.Switch(
                     checked = bgMonitoring,
                     onCheckedChange = { viewModel.setBackgroundMonitoring(it) }
-                )
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        // Issue #31 setting — deprecated: the per-group LOCAL_AUTO_UNFREEZE replaces this
-        // global toggle. Kept for users who enabled it in v0.1.4-beta.1. Removed in v0.1.5.
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = androidx.compose.material3.CardDefaults.cardColors(
-                containerColor = colorScheme.surfaceVariant
-            )
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Размораживать группы при включении/отключении VPN",
-                        style = typography.bodyMedium
-                    )
-                    Text(
-                        "После включения VPN размораживает «Только VPN», после отключения — «Без VPN».",
-                        style = typography.bodySmall,
-                        color = colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Устаревший переключатель. Будет удалён в v0.1.5. Вместо него используйте группу «Без VPN + уведомления» для нужных приложений.",
-                        style = typography.bodySmall,
-                        color = colorScheme.error
-                    )
-                }
-                androidx.compose.material3.Switch(
-                    checked = unfreezeManagedAppsOnVpnToggle,
-                    onCheckedChange = { viewModel.setUnfreezeManagedAppsOnVpnToggle(it) }
                 )
             }
         }
@@ -267,7 +231,11 @@ fun SettingsScreen(
                         color = colorScheme.onSurfaceVariant
                     )
                 }
-                Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -306,7 +274,11 @@ fun SettingsScreen(
                         color = colorScheme.onSurfaceVariant
                     )
                 }
-                Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -330,7 +302,11 @@ fun SettingsScreen(
                         color = colorScheme.onSurfaceVariant
                     )
                 }
-                Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -388,7 +364,11 @@ fun SettingsScreen(
                         color = colorScheme.onSurfaceVariant
                     )
                 }
-                Text("›", style = typography.headlineSmall, color = colorScheme.onSurfaceVariant)
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant
+                )
             }
         }
 

@@ -23,7 +23,6 @@ data class BackupSettings(
     val vpnClientPackage: String? = null,
     val backgroundMonitoring: Boolean? = null,
     val freezeOnBoot: Boolean? = null,
-    val unfreezeOnVpnToggle: Boolean? = null,
     val launcherSafeMode: Boolean? = null,
 )
 
@@ -44,7 +43,6 @@ object AppConfigBackupSerializer {
     private const val SETTING_VPN_CLIENT_PACKAGE = "vpn_client_package"
     private const val SETTING_BACKGROUND_MONITORING = "background_monitoring"
     private const val SETTING_FREEZE_ON_BOOT = "freeze_on_boot"
-    private const val SETTING_UNFREEZE_ON_VPN_TOGGLE = "unfreeze_on_vpn_toggle"
     private const val SETTING_LAUNCHER_SAFE_MODE = "launcher_safe_mode"
 
     fun toJson(backup: AppConfigBackup): String {
@@ -57,7 +55,6 @@ object AppConfigBackupSerializer {
         backup.settings.vpnClientPackage?.let { settings.put(SETTING_VPN_CLIENT_PACKAGE, it) }
         backup.settings.backgroundMonitoring?.let { settings.put(SETTING_BACKGROUND_MONITORING, it) }
         backup.settings.freezeOnBoot?.let { settings.put(SETTING_FREEZE_ON_BOOT, it) }
-        backup.settings.unfreezeOnVpnToggle?.let { settings.put(SETTING_UNFREEZE_ON_VPN_TOGGLE, it) }
         backup.settings.launcherSafeMode?.let { settings.put(SETTING_LAUNCHER_SAFE_MODE, it) }
         root.put(KEY_SETTINGS, settings)
 
@@ -93,7 +90,6 @@ object AppConfigBackupSerializer {
             vpnClientPackage = settingsObj.optStringOrNull(SETTING_VPN_CLIENT_PACKAGE),
             backgroundMonitoring = settingsObj.optBooleanOrNull(SETTING_BACKGROUND_MONITORING),
             freezeOnBoot = settingsObj.optBooleanOrNull(SETTING_FREEZE_ON_BOOT),
-            unfreezeOnVpnToggle = settingsObj.optBooleanOrNull(SETTING_UNFREEZE_ON_VPN_TOGGLE),
             launcherSafeMode = settingsObj.optBooleanOrNull(SETTING_LAUNCHER_SAFE_MODE),
         )
 

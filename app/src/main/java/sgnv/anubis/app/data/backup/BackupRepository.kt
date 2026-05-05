@@ -36,7 +36,6 @@ class BackupRepository(
                 ?.takeIf { it.isNotBlank() },
             backgroundMonitoring = prefs.optBooleanOrNull(AppSettings.KEY_BACKGROUND_MONITORING),
             freezeOnBoot = prefs.optBooleanOrNull(AppSettings.KEY_FREEZE_ON_BOOT),
-            unfreezeOnVpnToggle = prefs.optBooleanOrNull(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE),
             launcherSafeMode = prefs.optBooleanOrNull(AppSettings.KEY_LAUNCHER_SAFE_MODE),
         )
 
@@ -100,10 +99,6 @@ class BackupRepository(
             }
             settings.freezeOnBoot?.let {
                 putBoolean(AppSettings.KEY_FREEZE_ON_BOOT, it)
-                applied++
-            }
-            settings.unfreezeOnVpnToggle?.let {
-                putBoolean(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE, it)
                 applied++
             }
             settings.launcherSafeMode?.let {

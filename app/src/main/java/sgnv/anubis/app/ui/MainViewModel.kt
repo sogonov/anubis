@@ -102,8 +102,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val backgroundMonitoring: StateFlow<Boolean> = _backgroundMonitoring
 
     // Exposes issue #31 behavior to Compose settings UI.
-    private val _unfreezeManagedAppsOnVpnToggle = MutableStateFlow(false)
-    val unfreezeManagedAppsOnVpnToggle: StateFlow<Boolean> = _unfreezeManagedAppsOnVpnToggle
     
     private val _launcherSafeMode = MutableStateFlow(false)
     val launcherSafeMode: StateFlow<Boolean> = _launcherSafeMode
@@ -149,7 +147,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scheduleAutoFreeze()
         observeVpnState()
         loadBackgroundMonitoring()
-        loadUnfreezeManagedAppsOnVpnToggle()
         loadLauncherSafeMode()
         checkDangerousApps()
         loadUpdateCheckPref()
@@ -509,21 +506,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setUnfreezeManagedAppsOnVpnToggle(enabled: Boolean) {
-        _unfreezeManagedAppsOnVpnToggle.value = enabled
-        // Persist immediately so orchestrators and services pick the flag up without restart.
-        AppSettings.prefs(getApplication())
-            .edit {
-                putBoolean(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE, enabled)
-            }
-    }
-
-    private fun loadUnfreezeManagedAppsOnVpnToggle() {
-        // Load once on startup; services read the same flag directly from shared prefs.
-        _unfreezeManagedAppsOnVpnToggle.value = AppSettings.prefs(getApplication())
-            .getBoolean(AppSettings.KEY_UNFREEZE_ON_VPN_TOGGLE, false)
-    }
-
     fun setLauncherSafeMode(enabled: Boolean) {
         _launcherSafeMode.value = enabled
         AppSettings.prefs(getApplication())
@@ -746,7 +728,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     loadInstalledApps()
                     loadGroupedApps()
-                    loadUnfreezeManagedAppsOnVpnToggle()
                     loadLauncherSafeMode()
                     loadSelectedClient()
                 }

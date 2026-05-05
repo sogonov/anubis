@@ -16,7 +16,6 @@ object AppSettings {
     const val KEY_VPN_CLIENT_PACKAGE = "vpn_client_package"
     const val KEY_BACKGROUND_MONITORING = "background_monitoring"
     const val KEY_FREEZE_ON_BOOT = "freeze_on_boot"
-    const val KEY_UNFREEZE_ON_VPN_TOGGLE = "unfreeze_on_vpn_toggle"
     const val KEY_LAUNCHER_SAFE_MODE = "launcher_safe_mode"
     private const val KEY_VPN_CLIENT_AUTOMATION_TOKEN_PREFIX = "vpn_client_automation_token_"
     private const val TAG = "AppSettings"
@@ -63,11 +62,6 @@ object AppSettings {
         securePrefs.edit { putString(key, legacyToken) }
         legacyPrefs.edit { remove(key) }
         return legacyToken
-    }
-
-    /** Optional behavior: unfreeze the opposite managed group after VPN state changes. */
-    fun shouldUnfreezeManagedAppsOnVpnToggle(context: Context): Boolean {
-        return prefs(context).getBoolean(KEY_UNFREEZE_ON_VPN_TOGGLE, false)
     }
 
     /** Slow down mass-unfreeze to reduce launcher duplicate shortcuts on misbehaving OEM launchers. */
