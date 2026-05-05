@@ -349,6 +349,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Direct group assignment from the long-press sheet — issue #78. */
+    fun setAppGroup(packageName: String, group: AppGroup) {
+        viewModelScope.launch {
+            repository.setAppGroup(packageName, group)
+            loadInstalledApps()
+            loadGroupedApps()
+        }
+    }
+
+    /** Synchronous lookup against the in-memory installed-apps cache. */
+    fun getAppGroup(packageName: String): AppGroup? =
+        _installedApps.value.find { it.packageName == packageName }?.group
+
     /** Directly assign an apps to a specific group (used by the Home-screen inline add picker). */
     suspend fun setAppsGroup(
         packageNames: Collection<String>,

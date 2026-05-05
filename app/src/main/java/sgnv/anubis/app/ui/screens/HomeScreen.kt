@@ -23,8 +23,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -459,6 +461,38 @@ fun HomeScreen(
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider()
 
+                // Group selector — issue #78. Direct assignment instead of cycling
+                // through groups by tap on the home tile.
+                val currentGroup = remember(pkg, frozenVersion) { viewModel.getAppGroup(pkg) }
+                Text(
+                    "Группа",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp)
+                )
+                GroupSelectionRow(
+                    label = "Без VPN",
+                    selected = currentGroup == AppGroup.LOCAL,
+                    onClick = { viewModel.setAppGroup(pkg, AppGroup.LOCAL); dismissMenuSheet() }
+                )
+                GroupSelectionRow(
+                    label = "Без VPN + уведомления",
+                    selected = currentGroup == AppGroup.LOCAL_AUTO_UNFREEZE,
+                    onClick = { viewModel.setAppGroup(pkg, AppGroup.LOCAL_AUTO_UNFREEZE); dismissMenuSheet() }
+                )
+                GroupSelectionRow(
+                    label = "Только VPN",
+                    selected = currentGroup == AppGroup.VPN_ONLY,
+                    onClick = { viewModel.setAppGroup(pkg, AppGroup.VPN_ONLY); dismissMenuSheet() }
+                )
+                GroupSelectionRow(
+                    label = "Запуск с VPN",
+                    selected = currentGroup == AppGroup.LAUNCH_VPN,
+                    onClick = { viewModel.setAppGroup(pkg, AppGroup.LAUNCH_VPN); dismissMenuSheet() }
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
                 // Actions
                 BottomSheetAction(
                     text = if (isFrozen) "Разморозить" else "Заморозить",
@@ -484,6 +518,35 @@ fun HomeScreen(
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun GroupSelectionRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+            if (selected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
