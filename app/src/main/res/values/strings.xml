@@ -92,6 +92,14 @@
     <string name="recovery_normal_title">Обычный сброс</string>
     <string name="recovery_normal_description">Разморозить только те приложения, которые замораживал Anubis, и очистить группы. Безопасный вариант — не трогает то, что вы отключали вручную.</string>
     <string name="recovery_reset_anubis_button">Сбросить Anubis</string>
+    <string name="recovery_unfreeze_keep_groups_title">Разморозить всё (группы сохранятся)</string>
+    <string name="recovery_unfreeze_keep_groups_description">Разморозит замороженные приложения, оставив их в группах. Подходит для временной работы с приложением без удаления из группы или для обновления пакетов. При следующем переключении VPN правила групп применятся заново.</string>
+    <string name="recovery_unfreeze_keep_groups_button">Разморозить всё</string>
+    <string name="recovery_unfreeze_keep_groups_dialog_title">Разморозить все приложения?</string>
+    <string name="recovery_unfreeze_keep_groups_dialog_text">Все замороженные приложения будут разморожены. Группы сохранятся, и при следующем переключении VPN правила применятся заново.</string>
+    <string name="recovery_unfreeze_keep_groups_confirm">Разморозить</string>
+    <string name="recovery_unfreeze_keep_groups_completed">Разморожено приложений: %1$d. Группы сохранены.</string>
+
     <string name="recovery_emergency_title">Аварийная разморозка</string>
     <string name="recovery_emergency_description">Найти и разморозить ВСЕ отключённые пользовательские приложения. Нужно, если вы переустанавливали Anubis и данные о группах утеряны. Внимание: разморозит и те приложения, которые вы отключали вручную через настройки Android.</string>
     <string name="recovery_unfreeze_all_disabled_button">Разморозить все отключённые</string>

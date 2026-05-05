@@ -135,6 +135,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _resetCompleted = MutableSharedFlow<Int>()
     val resetCompleted: SharedFlow<Int> = _resetCompleted
+    private val _unfreezeKeepGroupsCompleted = MutableSharedFlow<Int>()
+    val unfreezeKeepGroupsCompleted: SharedFlow<Int> = _unfreezeKeepGroupsCompleted
     private val _toastMessages = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val toastMessages: SharedFlow<String> = _toastMessages
 
@@ -401,6 +403,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             loadGroupedApps()
             orchestrator.syncState()
             _resetCompleted.emit(unfrozenCount)
+        }
+    }
+
+    /** Issues #142, #144: temporary mass-unfreeze that leaves group memberships intact.
+     *  Useful for quick package updates or one-off use of a VPN_ONLY app without VPN —
+     *  the next VPN state transition reapplies group rules. */
+    fun unfreezeAllKeepGroups() {
+        if (!ensureShizukuReadyForAction()) return
+        viewModelScope.launch {
+            val allManaged = repository.getAllManagedPackages()
+            var unfrozenCount = 0
+            for (pkg in allManaged) {
+                if (shizukuManager.isAppFrozen(pkg)) {
+                    val result = shizukuManager.unfreezeApp(pkg)
+                    if (result.isFailure) {
+                        AppLogger.e(TAG, "unfreezeAllKeepGroups.unfreezeApp failed for package=$pkg", result.exceptionOrNull())
+                    } else {
+                        unfrozenCount++
+                    }
+                }
+            }
+            loadInstalledApps()
+            loadGroupedApps()
+            orchestrator.syncState()
+            _unfreezeKeepGroupsCompleted.emit(unfrozenCount)
         }
     }
 

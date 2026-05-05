@@ -52,6 +52,9 @@ fun RecoveryScreen(
     var showResetDialog by remember { mutableStateOf(false) }
     val dismissResetDialog: () -> Unit = { showResetDialog = false }
 
+    var showKeepGroupsDialog by remember { mutableStateOf(false) }
+    val dismissKeepGroupsDialog: () -> Unit = { showKeepGroupsDialog = false }
+
     var showScanDialog by remember { mutableStateOf(false) }
     val dismissScanDialog: () -> Unit = { showScanDialog = false }
 
@@ -68,6 +71,17 @@ fun RecoveryScreen(
             Toast.makeText(
                 context,
                 context.getString(R.string.recovery_reset_completed, count),
+                Toast.LENGTH_LONG
+            ).show()
+            onBack()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.unfreezeKeepGroupsCompleted.collect { count ->
+            Toast.makeText(
+                context,
+                context.getString(R.string.recovery_unfreeze_keep_groups_completed, count),
                 Toast.LENGTH_LONG
             ).show()
             onBack()
@@ -135,6 +149,36 @@ fun RecoveryScreen(
 
         Spacer(Modifier.height(16.dp))
 
+        // Mass unfreeze without clearing groups — issues #142, #144.
+        // Slots between safe reset (destructive) and emergency scan (nuclear).
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    stringResource(R.string.recovery_unfreeze_keep_groups_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.recovery_unfreeze_keep_groups_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        if (!requireShizukuReady()) return@OutlinedButton
+                        showKeepGroupsDialog = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.recovery_unfreeze_keep_groups_button))
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
         // Emergency scan — PM-based
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -193,6 +237,29 @@ fun RecoveryScreen(
             },
             dismissButton = {
                 TextButton(onClick = dismissResetDialog) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
+    }
+
+    if (showKeepGroupsDialog) {
+        AlertDialog(
+            onDismissRequest = dismissKeepGroupsDialog,
+            title = { Text(stringResource(R.string.recovery_unfreeze_keep_groups_dialog_title)) },
+            text = {
+                Text(stringResource(R.string.recovery_unfreeze_keep_groups_dialog_text))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.unfreezeAllKeepGroups()
+                    dismissKeepGroupsDialog()
+                }) {
+                    Text(stringResource(R.string.recovery_unfreeze_keep_groups_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = dismissKeepGroupsDialog) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             }
         )
     }
