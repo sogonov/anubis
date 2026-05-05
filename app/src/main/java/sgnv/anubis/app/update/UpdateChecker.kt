@@ -37,9 +37,17 @@ object UpdateChecker {
             .edit {putBoolean(KEY_ENABLED, enabled)}
     }
 
-    fun isIncludePrereleases(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_INCLUDE_PRERELEASES, false)
+    /**
+     * Default depends on the running build: pre-release installs default to "include
+     * pre-releases = true" so beta-1 users automatically see beta-2 etc. Stable installs
+     * default to false. Once the user toggles the switch in Settings, that explicit
+     * choice is persisted and overrides this default.
+     */
+    fun isIncludePrereleases(context: Context): Boolean {
+        val default = BuildConfig.VERSION_NAME.contains('-')
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_INCLUDE_PRERELEASES, default)
+    }
 
     fun setIncludePrereleases(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
