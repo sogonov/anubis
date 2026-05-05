@@ -1,15 +1,17 @@
 package sgnv.anubis.app.service
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import sgnv.anubis.app.AnubisApp
-import sgnv.anubis.app.data.model.AppGroup
-import sgnv.anubis.app.settings.AppSettings
-import sgnv.anubis.app.shizuku.shizukuUnavailableMessageRes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import sgnv.anubis.app.AnubisApp
+import sgnv.anubis.app.R
+import sgnv.anubis.app.data.model.AppGroup
+import sgnv.anubis.app.settings.AppSettings
+import sgnv.anubis.app.shizuku.shizukuUnavailableMessageRes
 
 /**
  * Transparent activity launched from home-screen pinned shortcuts AND from the
@@ -52,13 +54,40 @@ class ShortcutActivity : ComponentActivity() {
             }
             shizukuManager.awaitUserService()
 
+            // MATCH_DISABLED_COMPONENTS so we still recognize apps frozen by Anubis itself.
+            val isInstalled = try {
+                packageManager.getApplicationInfo(packageName, PackageManager.MATCH_DISABLED_COMPONENTS)
+                true
+            } catch (e: PackageManager.NameNotFoundException) {
+                false
+            }
+            if (!isInstalled) {
+                Toast.makeText(
+                    this@ShortcutActivity,
+                    getString(R.string.shortcut_app_not_installed, packageName),
+                    Toast.LENGTH_SHORT
+                ).show()
+                finish()
+                return@launch
+            }
+
             // Resolve group. Repository is authoritative; extras are a legacy fallback
             // for pinned shortcuts created before this change. URL-launch never falls
-            // back to extras — if the package isn't managed, silently finish.
+            // back to extras — if the package isn't managed, surface a toast so the
+            // user knows why nothing happened (Tasker / launcher widgets had silent
+            // no-ops before).
             val managedGroup = repository.getAppGroup(packageName)
             val group = when {
                 managedGroup != null -> managedGroup
-                isUrlLaunch -> { finish(); return@launch }
+                isUrlLaunch -> {
+                    Toast.makeText(
+                        this@ShortcutActivity,
+                        getString(R.string.shortcut_app_not_managed, packageName),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    finish()
+                    return@launch
+                }
                 else -> intent.getStringExtra(EXTRA_GROUP)
                     ?.let { runCatching { AppGroup.valueOf(it) }.getOrNull() }
                     ?: AppGroup.LAUNCH_VPN

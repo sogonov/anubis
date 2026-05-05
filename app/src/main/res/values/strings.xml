@@ -81,6 +81,9 @@
     <string name="log_screen_clear_confirm_message">Все записи журнала будут удалены.</string>
     <string name="log_screen_clear_confirm_action">Очистить</string>
 
+    <string name="shortcut_app_not_installed">Anubis: приложение %1$s не установлено</string>
+    <string name="shortcut_app_not_managed">Anubis: приложение %1$s не добавлено в группы</string>
+
     <string name="shizuku_toast_not_installed">Функция недоступна: Shizuku не установлен</string>
     <string name="shizuku_toast_not_running">Функция недоступна: Shizuku не запущен</string>
     <string name="shizuku_toast_no_permission">Функция недоступна: нет разрешения Shizuku</string>
