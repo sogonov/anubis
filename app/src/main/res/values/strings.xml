@@ -67,10 +67,15 @@
 
     <string name="settings_journal_title">Журнал</string>
     <string name="settings_journal_description">Просмотр диагностических логов</string>
+    <string name="settings_journal_enabled_title">Запись журнала</string>
+    <string name="settings_journal_enabled_description">Сохранять события в журнал. Можно отключить, если функция не нужна.</string>
 
     <string name="log_screen_title">Журнал</string>
     <string name="log_screen_back">Назад</string>
     <string name="log_screen_clear">Очистить</string>
+    <string name="log_screen_share">Поделиться</string>
+    <string name="log_screen_share_subject">Журнал Anubis</string>
+    <string name="log_screen_share_chooser">Поделиться журналом</string>
     <string name="log_screen_empty">Нет записей</string>
     <string name="log_screen_clear_confirm_title">Очистить журнал?</string>
     <string name="log_screen_clear_confirm_message">Все записи журнала будут удалены.</string>

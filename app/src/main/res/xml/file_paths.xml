@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- cacheDir/journal-share/ — snapshots written by LogScreen for ACTION_SEND. -->
+    <cache-path name="journal-share" path="journal-share/" />
+</paths>

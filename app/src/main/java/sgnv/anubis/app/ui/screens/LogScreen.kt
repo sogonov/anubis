@@ -1,5 +1,6 @@
 package sgnv.anubis.app.ui.screens
 
+import android.content.Intent
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
@@ -25,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,8 +35,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import sgnv.anubis.app.R
 import sgnv.anubis.app.util.AppLogger
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val CONTENT_PADDING = 16.dp
 private val BACK_ICON_SPACING = 4.dp
@@ -42,6 +52,7 @@ private val HEADER_BOTTOM_SPACING = 12.dp
 private const val LOG_TEXT_SIZE_SP = 12f
 private const val NO_PADDING = 0
 private const val NEW_LINE = "\n"
+private const val JOURNAL_SHARE_DIR = "journal-share"
 
 @Composable
 fun LogScreen(
@@ -49,6 +60,7 @@ fun LogScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val lines by AppLogger.lines.collectAsState()
     var showClearDialog by remember { mutableStateOf(false) }
     val dismissClearDialog: () -> Unit = { showClearDialog = false }
@@ -73,8 +85,40 @@ fun LogScreen(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
-            TextButton(onClick = { showClearDialog = true }) {
-                Text(stringResource(R.string.log_screen_clear))
+            Row {
+                val shareSubject = stringResource(R.string.log_screen_share_subject)
+                val shareChooser = stringResource(R.string.log_screen_share_chooser)
+                TextButton(
+                    onClick = {
+                        val snapshot = lines.joinToString(separator = NEW_LINE, postfix = NEW_LINE)
+                        coroutineScope.launch {
+                            val file = withContext(Dispatchers.IO) {
+                                val dir = File(context.cacheDir, JOURNAL_SHARE_DIR).apply { mkdirs() }
+                                val stamp = SimpleDateFormat(
+                                    "yyyyMMdd-HHmmss",
+                                    Locale.US
+                                ).format(Date())
+                                File(dir, "anubis-journal-$stamp.log")
+                                    .also { it.writeText(snapshot, Charsets.UTF_8) }
+                            }
+                            val authority = "${context.packageName}.fileprovider"
+                            val uri = FileProvider.getUriForFile(context, authority, file)
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                putExtra(Intent.EXTRA_SUBJECT, shareSubject)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(intent, shareChooser))
+                        }
+                    },
+                    enabled = lines.isNotEmpty()
+                ) {
+                    Text(stringResource(R.string.log_screen_share))
+                }
+                TextButton(onClick = { showClearDialog = true }) {
+                    Text(stringResource(R.string.log_screen_clear))
+                }
             }
         }
 

@@ -124,6 +124,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateIncludePrereleases = MutableStateFlow(false)
     val updateIncludePrereleases: StateFlow<Boolean> = _updateIncludePrereleases
 
+    private val _journalEnabled = MutableStateFlow(AppLogger.isEnabled())
+    val journalEnabled: StateFlow<Boolean> = _journalEnabled
+
+    fun setJournalEnabled(enabled: Boolean) {
+        _journalEnabled.value = enabled
+        AppLogger.setEnabled(getApplication(), enabled)
+    }
+
     private val _updateCheckInProgress = MutableStateFlow(false)
     val updateCheckInProgress: StateFlow<Boolean> = _updateCheckInProgress
 

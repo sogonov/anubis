@@ -214,7 +214,37 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // Journal entry
+        // Journal toggle — disable journaling entirely if user doesn't need it.
+        // Existing entries stay viewable; only new appends are gated.
+        val journalEnabled by viewModel.journalEnabled.collectAsState()
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_journal_enabled_title),
+                        style = typography.bodyMedium
+                    )
+                    Text(
+                        stringResource(R.string.settings_journal_enabled_description),
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
+                    )
+                }
+                androidx.compose.material3.Switch(
+                    checked = journalEnabled,
+                    onCheckedChange = { viewModel.setJournalEnabled(it) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Journal viewer entry — kept available even when journaling is off so users
+        // can still review and share previously captured entries.
         Card(
             modifier = Modifier
                 .fillMaxWidth()

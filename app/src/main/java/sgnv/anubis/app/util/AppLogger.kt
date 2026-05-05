@@ -30,7 +30,15 @@ object AppLogger {
     private const val INDENT = "    "
     private const val EMPTY = ""
 
+    // Local prefs access avoids coupling util/ to settings/ — only journal-on/off
+    // lives here. Keys mirror AppSettings.PREFS_NAME by convention.
+    private const val PREFS_NAME = "settings"
+    private const val KEY_ENABLED = "journal_enabled"
+
     private val linesLock = Any()
+
+    @Volatile
+    private var enabled: Boolean = true
 
     // SimpleDateFormat is not thread-safe; previously a single shared instance
     // was used without locking from formatLine, which races on concurrent
@@ -59,6 +67,9 @@ object AppLogger {
     fun init(context: Context) {
         synchronized(linesLock) {
             if (logFile != null) return
+            enabled = context.applicationContext
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_ENABLED, true)
             val file = File(context.applicationContext.filesDir, FILE_NAME)
             logFile = file
             val restored = runCatching { file.readLines(Charsets.UTF_8) }.getOrDefault(emptyList())
@@ -71,8 +82,18 @@ object AppLogger {
         }
     }
 
+    fun isEnabled(): Boolean = enabled
+
+    fun setEnabled(context: Context, value: Boolean) {
+        enabled = value
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_ENABLED, value).apply()
+    }
+
     fun e(tag: String, message: String, throwable: Throwable? = null) {
         runCatching { Log.e(tag, message, throwable) }
+        if (!enabled) return
         val base = formatLine(level = LEVEL_ERROR, tag = tag, message = message)
         val stackLines = throwable
             ?.toSafeStackTraceString()
@@ -85,6 +106,7 @@ object AppLogger {
 
     fun i(tag: String, message: String) {
         runCatching { Log.i(tag, message) }
+        if (!enabled) return
         appendLines(listOf(formatLine(level = LEVEL_INFO, tag = tag, message = message)))
     }
 
