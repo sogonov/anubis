@@ -106,6 +106,7 @@ fun HomeScreen(
         || stealthState == StealthState.DISABLING
         || stealthState == StealthState.UNFREEZING
     val cancellable by viewModel.cancellable.collectAsState()
+    val paused by viewModel.paused.collectAsState()
 
     val statusColor by animateColorAsState(
         when (stealthState) {
@@ -144,6 +145,45 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
+        // Pause banner. Sits above the status card so the user can't miss that
+        // automatic group actions are off — a paused-but-still-green status card
+        // would be misleading. Tapping "Возобновить" flips it back instantly.
+        if (paused) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.paused_banner_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            stringResource(R.string.paused_banner_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    TextButton(onClick = { viewModel.setPaused(false) }) {
+                        Text(stringResource(R.string.paused_resume))
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         // Status + Toggle
         Card(
             modifier = Modifier.fillMaxWidth(),

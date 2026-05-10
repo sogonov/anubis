@@ -17,6 +17,7 @@ object AppSettings {
     const val KEY_BACKGROUND_MONITORING = "background_monitoring"
     const val KEY_FREEZE_ON_BOOT = "freeze_on_boot"
     const val KEY_LAUNCHER_SAFE_MODE = "launcher_safe_mode"
+    const val KEY_PAUSED = "paused"
     private const val KEY_VPN_CLIENT_AUTOMATION_TOKEN_PREFIX = "vpn_client_automation_token_"
     private const val TAG = "AppSettings"
 

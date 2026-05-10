@@ -75,6 +75,17 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".service.PauseTileService"
+            android:icon="@drawable/ic_pause"
+            android:label="@string/pause_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".service.BootReceiver"
             android:exported="true">
@@ -106,6 +117,18 @@
         <service
             android:name=".service.StealthWidgetService"
             android:exported="false" />
+
+        <receiver
+            android:name=".service.PauseWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="sgnv.anubis.app.PAUSE_WIDGET_TOGGLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_pause_info" />
+        </receiver>
 
         <!-- Shizuku provider -->
         <provider

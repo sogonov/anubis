@@ -1,6 +1,9 @@
 package sgnv.anubis.app.service
 
+import android.content.ComponentName
 import android.content.Context
+import android.service.quicksettings.TileService
+import androidx.core.content.edit
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.repository.AppRepository
 import sgnv.anubis.app.settings.AppSettings
@@ -81,6 +84,39 @@ class StealthOrchestrator(
      */
     fun cancelOngoing() {
         currentJob?.cancel(CancellationException("user-cancelled"))
+    }
+
+    /**
+     * Master pause (#145). When true, the orchestrator stops reacting to *external*
+     * VPN-up/down events — `freezeOnly` and `freezeVpnOnly` early-return without
+     * touching any group. Explicit user actions (toggle Stealth from Home or tile,
+     * shortcut launches, manual freeze/unfreeze) keep working — they're explicit
+     * intent and the user is in control. Already-frozen apps stay frozen; user
+     * unfreezes them via Recovery → "Разморозить всё" if they want to.
+     *
+     * Backed by SharedPreferences so the state survives process death — if the user
+     * paused us before going to bed, we're still paused after a reboot.
+     */
+    private val _paused = MutableStateFlow(
+        AppSettings.prefs(context).getBoolean(AppSettings.KEY_PAUSED, false)
+    )
+    val paused: StateFlow<Boolean> = _paused
+
+    fun setPaused(value: Boolean) {
+        if (_paused.value == value) return
+        _paused.value = value
+        AppSettings.prefs(context).edit { putBoolean(AppSettings.KEY_PAUSED, value) }
+        AppLogger.i(TAG, "paused=$value")
+        // Refresh out-of-process surfaces so the user sees the change wherever they
+        // toggled from — Home, Settings, the QS tile, or the widget. Each of these
+        // observes its own state silo, so changing one doesn't propagate without a push.
+        PauseWidgetProvider.updateAllWidgets(context)
+        runCatching {
+            TileService.requestListeningState(
+                context,
+                ComponentName(context, PauseTileService::class.java)
+            )
+        }
     }
 
     /**
@@ -316,6 +352,10 @@ class StealthOrchestrator(
      */
     suspend fun freezeOnly() {
         _lastError.value = null
+        if (_paused.value) {
+            AppLogger.i(TAG, "freezeOnly skipped: orchestrator paused")
+            return
+        }
         if (!checkShizuku()) return
         // Handle external/manual VPN activation using the same managed-group rules.
         applyManagedStateForVpn(active = true)
@@ -325,6 +365,10 @@ class StealthOrchestrator(
      * VPN turned OFF — freeze VPN_ONLY group.
      */
     suspend fun freezeVpnOnly() {
+        if (_paused.value) {
+            AppLogger.i(TAG, "freezeVpnOnly skipped: orchestrator paused")
+            return
+        }
         if (!checkShizuku()) return
         // Handle external/manual VPN shutdown using the same managed-group rules.
         applyManagedStateForVpn(active = false)

@@ -63,6 +63,17 @@
     <string name="home_status_unfreezing">РАЗМОРОЗКА...</string>
     <string name="home_cancel_transition">Отменить операцию</string>
 
+    <string name="paused_banner_title">Anubis приостановлен</string>
+    <string name="paused_banner_subtitle">Заморозки по VPN не срабатывают. Ручные действия и переключатель защиты работают.</string>
+    <string name="paused_resume">Возобновить</string>
+
+    <string name="settings_pause_title">Приостановить Anubis</string>
+    <string name="settings_pause_description">Не реагировать на включение/выключение VPN извне. Уже замороженные приложения остаются замороженными — снять можно через «Восстановление» → «Разморозить всё», либо на главном экране разморозить нужные приложения по отдельности.</string>
+
+    <string name="pause_tile_label">Anubis Pause</string>
+    <string name="pause_widget_label">Anubis: пауза</string>
+    <string name="pause_widget_label_active">Anubis активен</string>
+
     <string name="settings_launcher_safe_mode_description">Уменьшает вероятность дубликатов ярлыков: массовая разморозка выполняется по одному приложению с короткой паузой.</string>
     <string name="settings_launcher_safe_mode_title">Безопасный режим лаунчера</string>
 

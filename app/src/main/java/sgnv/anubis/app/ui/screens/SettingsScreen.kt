@@ -72,6 +72,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(8.dp))
 
         val bgMonitoring by viewModel.backgroundMonitoring.collectAsState()
+        val paused by viewModel.paused.collectAsState()
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -82,7 +83,10 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Фоновый мониторинг VPN", style = typography.bodyMedium)
                     Text(
-                        "Автозаморозка при изменении VPN вне Anubis",
+                        "Постоянное уведомление, чтобы Android не выгружал Anubis из памяти. " +
+                            "Без него реакции на включение/выключение VPN могут срабатывать с задержкой " +
+                            "или не срабатывать вовсе, пока приложение закрыто. Отключать реакции — " +
+                            "это «Приостановить Anubis» ниже, не этот переключатель.",
                         style = typography.bodySmall,
                         color = colorScheme.onSurfaceVariant
                     )
@@ -90,6 +94,32 @@ fun SettingsScreen(
                 androidx.compose.material3.Switch(
                     checked = bgMonitoring,
                     onCheckedChange = { viewModel.setBackgroundMonitoring(it) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_pause_title),
+                        style = typography.bodyMedium
+                    )
+                    Text(
+                        stringResource(R.string.settings_pause_description),
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
+                    )
+                }
+                androidx.compose.material3.Switch(
+                    checked = paused,
+                    onCheckedChange = { viewModel.setPaused(it) }
                 )
             }
         }

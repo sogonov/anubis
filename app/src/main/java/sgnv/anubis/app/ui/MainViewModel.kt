@@ -69,6 +69,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Cancel the currently running enable/disable, if any. */
     fun cancelTransition() = orchestrator.cancelOngoing()
 
+    /** Master pause: orchestrator stops reacting to external VPN-up/down (#145). */
+    val paused: StateFlow<Boolean> = orchestrator.paused
+    fun setPaused(value: Boolean) = orchestrator.setPaused(value)
+
     /** Easter-egg: "Заморожено N за X с" / "Разморожено ..." — direct pass-through. */
     val benchmark: SharedFlow<String> = orchestrator.benchmark
 
