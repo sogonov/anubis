@@ -320,7 +320,7 @@ class StealthOrchestrator(
             _progressText.value = "Отключаю VPN..."
             if (!stopVpn(client, detectedPackage)) {
                 _progressText.value = null
-                _lastError.value = "Не удалось отключить VPN. Приложения НЕ разморожены."
+                _lastError.value = "Не удалось отключить VPN. Приложения НЕ разморожены. Проверьте, что Anubis имеет разрешение VPN, и что выбран правильный VPN-клиент."
                 _state.value = StealthState.ENABLED
                 return
             }
@@ -408,7 +408,7 @@ class StealthOrchestrator(
         if (_state.value == StealthState.ENABLED || vpnClientManager.vpnActive.value) {
             disable(vpnClient, detectedPackage)
             if (vpnClientManager.vpnActive.value) {
-                _lastError.value = "Не удалось отключить VPN. Приложение не запущено."
+                _lastError.value = "Не удалось отключить VPN. Приложение не запущено. Проверьте, что Anubis имеет разрешение VPN, и что выбран правильный VPN-клиент."
                 return
             }
         }

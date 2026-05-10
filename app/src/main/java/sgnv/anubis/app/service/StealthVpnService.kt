@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import sgnv.anubis.app.util.AppLogger
 
 /**
@@ -38,9 +37,13 @@ class StealthVpnService : VpnService() {
             if (fd != null) {
                 // Our VPN established → other VPN is revoked
                 fd.close()
-                Log.d(TAG, "Dummy VPN established and closed — other VPN disconnected")
+                AppLogger.i(TAG, "Dummy VPN established and closed — other VPN disconnected")
             } else {
-                Log.w(TAG, "establish() returned null — no VPN consent")
+                // Goes through AppLogger (not android.util.Log) so it lands in the
+                // user-visible journal (#136). Without VPN consent the dummy path
+                // silently no-ops — surfacing this is the single biggest hint for
+                // people who report "disable VPN doesn't work" (e.g. #132).
+                AppLogger.i(TAG, "establish() returned null — Anubis has no VPN consent. Dummy-VPN takeover skipped.")
             }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Failed to establish dummy VPN", e)
