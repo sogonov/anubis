@@ -64,6 +64,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val activeVpnPackage: StateFlow<String?> = vpnClientManager.activeVpnPackage
     val shizukuStatus: StateFlow<ShizukuStatus> = shizukuManager.status
     val frozenVersion: StateFlow<Long> = orchestrator.frozenVersion
+    val cancellable: StateFlow<Boolean> = orchestrator.cancellable
+
+    /** Cancel the currently running enable/disable, if any. */
+    fun cancelTransition() = orchestrator.cancelOngoing()
 
     /** Easter-egg: "Заморожено N за X с" / "Разморожено ..." — direct pass-through. */
     val benchmark: SharedFlow<String> = orchestrator.benchmark
@@ -172,10 +176,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                     orchestrator.syncState()
-
-                    if (active && orchestrator.lastError.value?.contains("вручную") == true) {
-                        orchestrator.clearError()
-                    }
 
                     delay(500)
                     refreshNetworkInfo()

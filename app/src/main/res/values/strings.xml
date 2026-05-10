@@ -61,6 +61,7 @@
     <string name="home_status_enabled">ЗАЩИТА АКТИВНА</string>
     <string name="home_status_enabling">ВКЛЮЧЕНИЕ...</string>
     <string name="home_status_unfreezing">РАЗМОРОЗКА...</string>
+    <string name="home_cancel_transition">Отменить операцию</string>
 
     <string name="settings_launcher_safe_mode_description">Уменьшает вероятность дубликатов ярлыков: массовая разморозка выполняется по одному приложению с короткой паузой.</string>
     <string name="settings_launcher_safe_mode_title">Безопасный режим лаунчера</string>

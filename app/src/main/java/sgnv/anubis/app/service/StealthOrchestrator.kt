@@ -10,7 +10,9 @@ import sgnv.anubis.app.vpn.SelectedVpnClient
 import sgnv.anubis.app.vpn.VpnClientControls
 import sgnv.anubis.app.vpn.VpnClientManager
 import sgnv.anubis.app.vpn.VpnControlMode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -53,6 +55,33 @@ class StealthOrchestrator(
     val lastError: StateFlow<String?> = _lastError
 
     fun clearError() { _lastError.value = null }
+
+    /**
+     * Tracks the in-flight enable/disable job so the UI can interrupt a long wait
+     * (e.g. user picked a wrong client and is stuck on the 90 s MANUAL_VPN_WAIT_MS).
+     * Volatile because [cancelOngoing] is called from the UI thread while [enable]
+     * /[disable] mutate this field on Dispatchers.Default.
+     */
+    @Volatile
+    private var currentJob: Job? = null
+
+    /**
+     * Whether a transitional operation can be cancelled by the user. Exposed as a
+     * StateFlow so the cancel button in HomeScreen can render only when there's
+     * actually something to cancel (i.e. enable() with VPN-up wait is in flight).
+     */
+    private val _cancellable = MutableStateFlow(false)
+    val cancellable: StateFlow<Boolean> = _cancellable
+
+    /**
+     * Request cancellation of the currently running enable/disable operation.
+     * No-op if nothing is in flight. The orchestrator will roll back any
+     * already-applied side effects (re-freeze idle client, unfreeze
+     * LOCAL_AUTO_UNFREEZE) so we don't leave the user with a half-enabled state.
+     */
+    fun cancelOngoing() {
+        currentJob?.cancel(CancellationException("user-cancelled"))
+    }
 
     /**
      * Sync stealth state from reality.
@@ -102,17 +131,44 @@ class StealthOrchestrator(
         _state.value = StealthState.ENABLING
         val app = context.applicationContext as AnubisApp
         val job = app.scope.launch { enableImpl(client) }
+        currentJob = job
+        _cancellable.value = true
+        // MANUAL mode now waits for the user to connect the VPN themselves, so the
+        // overall ceiling has to absorb that wait — otherwise the 45 s cap would clip
+        // MANUAL_VPN_WAIT_MS at ~half its budget.
+        val ceilingMs = if (client.controlMode == VpnControlMode.MANUAL) {
+            MANUAL_TOTAL_OP_TIMEOUT_MS
+        } else {
+            TOTAL_OP_TIMEOUT_MS
+        }
         try {
-            val finished = withTimeoutOrNull(TOTAL_OP_TIMEOUT_MS) {
+            val finished = withTimeoutOrNull(ceilingMs) {
                 job.join(); true
             } ?: false
             if (!finished) {
                 job.cancel()  // best-effort; sync binder won't actually interrupt
+            }
+            // Cancellation can come from two sources: our own timeout above, or
+            // cancelOngoing() invoked by the UI cancel button. Both leave the same
+            // mid-enable side effects to undo: LOCAL_AUTO_UNFREEZE was eagerly
+            // frozen by enableImpl before the VPN was confirmed up, and the idle-
+            // frozen client was unfrozen earlier. applyManagedStateForVpn(false) is
+            // the canonical "DISABLED state" application (re-freezes the client,
+            // unfreezes LOCAL_AUTO_UNFREEZE) — running it here gets the system back
+            // into a coherent shape. fail() inside enableImpl already covers the
+            // non-cancelled timeout/failure paths.
+            if (job.isCancelled) {
                 _progressText.value = null
-                _lastError.value = "Операция превысила таймаут (${TOTAL_OP_TIMEOUT_MS / 1000} с). Попробуйте снова."
-                _state.value = StealthState.DISABLED
+                _lastError.value = if (!finished) {
+                    "Операция превысила таймаут (${ceilingMs / 1000} с). Попробуйте снова."
+                } else {
+                    "Операция отменена."
+                }
+                applyManagedStateForVpn(active = false)
             }
         } finally {
+            currentJob = null
+            _cancellable.value = false
             // Safety: never leave _state stuck in a transitional value — align with
             // actual VPN state so UI can't get stuck on the orange "ENABLING" banner
             // regardless of cancellation, missed code path or unexpected exception.
@@ -150,21 +206,28 @@ class StealthOrchestrator(
         }
         AppLogger.i(TAG, "VPN start command sent: ${client.packageName}")
 
-        if (client.controlMode != VpnControlMode.MANUAL && !waitForVpnOn(10_000)) {
+        // Wait for VPN-up in every mode, including MANUAL. Skipping the wait for MANUAL
+        // (the previous behaviour) prematurely flipped state to ENABLED — and from
+        // launchWithVpn that meant unfreeze + launch of the protected app while the user
+        // was still tapping "Connect" in the VPN client. The app would briefly run with
+        // no tunnel (#119). MANUAL gets a longer budget because the user is in the loop.
+        val waitTimeoutMs = if (client.controlMode == VpnControlMode.MANUAL) {
+            MANUAL_VPN_WAIT_MS
+        } else {
+            AUTO_VPN_WAIT_MS
+        }
+        if (client.controlMode == VpnControlMode.MANUAL) {
+            _progressText.value = "Подключите VPN в ${client.displayName}..."
+        }
+        if (!waitForVpnOn(waitTimeoutMs)) {
             AppLogger.e(TAG, "VPN did not become active in time: ${client.packageName}")
             fail("VPN client ${client.displayName} did not come up in time.")
             return
         }
-        if (client.controlMode != VpnControlMode.MANUAL) {
-            AppLogger.i(TAG, "VPN became active: ${client.packageName}")
-        }
+        AppLogger.i(TAG, "VPN became active: ${client.packageName}")
 
         bumpVersion()
         _progressText.value = null
-
-        if (client.controlMode == VpnControlMode.MANUAL) {
-            _lastError.value = "Подключите VPN вручную в ${client.displayName}"
-        }
 
         // Compare-and-set guards the race where VpnMonitorService.onLost fires on a
         // binder thread between waitForVpnOn succeeding and this line — it would
@@ -187,16 +250,31 @@ class StealthOrchestrator(
         _state.value = StealthState.DISABLING
         val app = context.applicationContext as AnubisApp
         val job = app.scope.launch { disableImpl(client, detectedPackage) }
+        currentJob = job
+        _cancellable.value = true
         try {
             val finished = withTimeoutOrNull(TOTAL_OP_TIMEOUT_MS) {
                 job.join(); true
             } ?: false
             if (!finished) {
                 job.cancel()
+            }
+            if (job.isCancelled) {
                 _progressText.value = null
-                _lastError.value = "Операция превысила таймаут (${TOTAL_OP_TIMEOUT_MS / 1000} с). Попробуйте снова."
+                _lastError.value = if (!finished) {
+                    "Операция превысила таймаут (${TOTAL_OP_TIMEOUT_MS / 1000} с). Попробуйте снова."
+                } else {
+                    "Операция отменена."
+                }
+                // Disable rolls forward through stopVpn → applyManagedStateForVpn(false).
+                // If the user cancelled before VPN went down, alignStateWithVpn() in
+                // finally restores ENABLED. If VPN went down already, alignStateWithVpn()
+                // pins us to DISABLED. Either way, the group rules will reapply on the
+                // next VPN-up/down event — no eager rollback needed here.
             }
         } finally {
+            currentJob = null
+            _cancellable.value = false
             alignStateWithVpn()
         }
     }
@@ -521,6 +599,23 @@ class StealthOrchestrator(
         // force-stop. If we hit this ceiling something is genuinely broken (Shizuku
         // wedged, VPN client unresponsive) — no point waiting longer.
         const val TOTAL_OP_TIMEOUT_MS = 45_000L
+
+        // Same ceiling for MANUAL clients (Hiddify, AmneziaWG without API control, etc.)
+        // — the user has to open the VPN UI and tap "Connect" themselves, which can
+        // realistically take up to a minute on cold-start (server selection, handshake).
+        // 120 s leaves a buffer for slow OEMs without making the user wait absurdly long
+        // before a timeout is surfaced.
+        const val MANUAL_TOTAL_OP_TIMEOUT_MS = 120_000L
+
+        // waitForVpnOn timeout for clients we control via API (start/stop intent or
+        // toggle). VPN should be up within seconds; 10 s covers slow handshakes.
+        private const val AUTO_VPN_WAIT_MS = 10_000L
+
+        // waitForVpnOn timeout for MANUAL clients — the user has to connect the VPN
+        // themselves. 90 s is the budget to open the client, pick a server, tap Connect
+        // and finish the handshake. Total enable() ceiling (MANUAL_TOTAL_OP_TIMEOUT_MS)
+        // is sized to absorb this on top of freeze time.
+        private const val MANUAL_VPN_WAIT_MS = 90_000L
 
         private const val VPN_OFF_WAIT_AFTER_API_STOP_MS = 3_000L
         private const val VPN_OFF_WAIT_AFTER_DUMMY_MS = 2_000L

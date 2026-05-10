@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -104,6 +105,7 @@ fun HomeScreen(
     val isTransitioning = stealthState == StealthState.ENABLING
         || stealthState == StealthState.DISABLING
         || stealthState == StealthState.UNFREEZING
+    val cancellable by viewModel.cancellable.collectAsState()
 
     val statusColor by animateColorAsState(
         when (stealthState) {
@@ -181,7 +183,34 @@ fun HomeScreen(
                     )
                 }
                 if (isTransitioning) {
-                    CircularProgressIndicator(Modifier.size(32.dp), color = Color.White, strokeWidth = 3.dp)
+                    // Spinner + cancel cross. The cross only appears once orchestrator
+                    // marks the operation cancellable (currentJob != null in flight) —
+                    // before that there's nothing to cancel and the cross would just
+                    // produce a broken click. Tapping the box cancels the in-flight
+                    // enable/disable; the orchestrator rolls back side effects.
+                    Box(
+                        modifier = Modifier.size(40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            Modifier.size(32.dp),
+                            color = Color.White,
+                            strokeWidth = 3.dp
+                        )
+                        if (cancellable) {
+                            IconButton(
+                                onClick = { viewModel.cancelTransition() },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = stringResource(R.string.home_cancel_transition),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
                 } else {
                     Switch(
                         checked = isEnabled,
