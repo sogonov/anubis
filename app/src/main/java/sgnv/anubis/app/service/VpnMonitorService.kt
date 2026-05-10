@@ -10,7 +10,6 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.IBinder
-import android.os.Process
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +91,7 @@ class VpnMonitorService : Service() {
                     if (n == network) return@any false
                     val caps = cm.getNetworkCapabilities(n) ?: return@any false
                     caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
-                        caps.ownerUid != Process.myUid()
+                        !isOwnVpnNetwork(cm, n)
                 }
                 if (!stillActive) {
                     scope.launch {
@@ -112,8 +111,18 @@ class VpnMonitorService : Service() {
         }
     }
 
+    /**
+     * Identifies our own force-disconnect dummy VPN by its local-end address
+     * (`StealthVpnService.DUMMY_VPN_ADDRESS`, picked from the RFC 2544 benchmarking
+     * range so no real VPN provider can collide with it). Avoids
+     * `NetworkCapabilities.getOwnerUid()` because it's API 30+ and the call site is
+     * on ConnectivityThread, where `NoSuchMethodError` is raised at class
+     * verification before our try/catch can intercept it (#106, #118).
+     */
     private fun isOwnVpnNetwork(cm: ConnectivityManager, network: Network): Boolean = try {
-        cm.getNetworkCapabilities(network)?.ownerUid == Process.myUid()
+        cm.getLinkProperties(network)?.linkAddresses?.any {
+            it.address.hostAddress == StealthVpnService.DUMMY_VPN_ADDRESS
+        } == true
     } catch (e: Exception) {
         AppLogger.e(TAG, "isOwnVpnNetwork failed", e)
         false

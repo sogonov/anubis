@@ -30,7 +30,7 @@ class StealthVpnService : VpnService() {
     private fun doDisconnect() {
         try {
             val fd = Builder()
-                .addAddress("10.255.255.1", 32)
+                .addAddress(DUMMY_VPN_ADDRESS, 32)
                 .setSession("stealth-disconnect")
                 .setBlocking(false)
                 .establish()
@@ -66,6 +66,16 @@ class StealthVpnService : VpnService() {
     companion object {
         private const val TAG = "StealthVpnService"
         const val ACTION_DISCONNECT = "sgnv.anubis.app.FORCE_DISCONNECT_VPN"
+
+        /**
+         * Local-end IP for our dummy VPN. Picked from RFC 2544 benchmarking range
+         * (198.18.0.0/15) — reserved for inter-network test devices and never
+         * legitimately used by real VPN providers, so VpnMonitorService can identify
+         * our own dummy by inspecting LinkProperties.linkAddresses (works on all API
+         * levels, unlike NetworkCapabilities.getOwnerUid which is API 30+ and would
+         * crash with NoSuchMethodError on Android 10).
+         */
+        const val DUMMY_VPN_ADDRESS = "198.18.0.1"
 
         /**
          * True while our dummy VPN is being set up, is active, or has just been torn
