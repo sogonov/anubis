@@ -28,16 +28,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,7 +53,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -64,11 +72,13 @@ import sgnv.anubis.app.R
 import sgnv.anubis.app.data.model.AppGroup
 import sgnv.anubis.app.data.model.ManagedApp
 import sgnv.anubis.app.service.StealthState
+import sgnv.anubis.app.settings.HomeSortMode
 import sgnv.anubis.app.shizuku.SHIZUKU_PACKAGE
 import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.shizuku.shizukuUnavailableMessageRes
 import sgnv.anubis.app.ui.MainViewModel
 import sgnv.anubis.app.ui.util.renderToImageBitmap
+import kotlinx.coroutines.delay
 
 private val grayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
 
@@ -107,6 +117,18 @@ fun HomeScreen(
         || stealthState == StealthState.UNFREEZING
     val cancellable by viewModel.cancellable.collectAsState()
     val paused by viewModel.paused.collectAsState()
+    val homeSortMode by viewModel.homeSortMode.collectAsState()
+
+    // Search filters apps inside each group (#86). Not a scroll-and-flash — that
+    // produced a jumpy UX because every keystroke re-scrolled and even the keyboard
+    // wobbled. Plain filtering keeps the user in place: matching apps stay, the
+    // rest fall away, and groups that go empty hide their headers entirely.
+    // Collapsed by default (lupa icon only); expands to a TextField on tap, mirroring
+    // the AppListScreen / VpnClientsScreen pattern. rememberSaveable so it survives
+    // rotation / process recreation.
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
 
     val statusColor by animateColorAsState(
         when (stealthState) {
@@ -325,6 +347,85 @@ fun HomeScreen(
             }
         }
 
+        // Search + sort row (#86, #56). Search is collapsed by default — only the
+        // lupa icon shows — and expands on tap to a full-width TextField. Same
+        // pattern as AppListScreen / VpnClientsScreen so the gesture is consistent
+        // across the app. Sort is a dropdown next to the search icon when collapsed;
+        // hidden while search is active to keep the row uncluttered.
+        Spacer(Modifier.height(16.dp))
+        if (searchActive) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(searchFocusRequester),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.common_search)) },
+                leadingIcon = {
+                    IconButton(onClick = {
+                        searchActive = false
+                        searchQuery = ""
+                    }) {
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.app_list_cd_close_search))
+                    }
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_clear))
+                        }
+                    }
+                }
+            )
+            LaunchedEffect(Unit) { searchFocusRequester.requestFocus() }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(onClick = { searchActive = true }) {
+                    Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.common_search))
+                }
+                var sortMenuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { sortMenuExpanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.home_sort_cd))
+                    }
+                    DropdownMenu(
+                        expanded = sortMenuExpanded,
+                        onDismissRequest = { sortMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.app_list_sort_name)) },
+                            onClick = {
+                                viewModel.setHomeSortMode(HomeSortMode.NAME)
+                                sortMenuExpanded = false
+                            },
+                            trailingIcon = {
+                                if (homeSortMode == HomeSortMode.NAME) {
+                                    Icon(Icons.Filled.Check, contentDescription = null)
+                                }
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.app_list_sort_package)) },
+                            onClick = {
+                                viewModel.setHomeSortMode(HomeSortMode.PACKAGE)
+                                sortMenuExpanded = false
+                            },
+                            trailingIcon = {
+                                if (homeSortMode == HomeSortMode.PACKAGE) {
+                                    Icon(Icons.Filled.Check, contentDescription = null)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         // App groups
             Spacer(Modifier.height(16.dp))
             AppGroupSection(
@@ -334,6 +435,8 @@ fun HomeScreen(
                 tintColor = MaterialTheme.colorScheme.secondary,
                 viewModel = viewModel,
                 frozenVersion = frozenVersion,
+                sortMode = homeSortMode,
+                searchQuery = searchQuery,
                 onClick = { pkg -> viewModel.launchLocal(pkg) },
                 onLongClick = { pkg -> menuApp = pkg },
                 onAdd = { addingToGroup = AppGroup.LOCAL_AUTO_UNFREEZE }
@@ -347,6 +450,8 @@ fun HomeScreen(
                 tintColor = MaterialTheme.colorScheme.error,
                 viewModel = viewModel,
                 frozenVersion = frozenVersion,
+                sortMode = homeSortMode,
+                searchQuery = searchQuery,
                 onClick = { pkg -> viewModel.launchLocal(pkg) },
                 onLongClick = { pkg -> menuApp = pkg },
                 onAdd = { addingToGroup = AppGroup.LOCAL }
@@ -360,6 +465,8 @@ fun HomeScreen(
                 tintColor = MaterialTheme.colorScheme.primary,
                 viewModel = viewModel,
                 frozenVersion = frozenVersion,
+                sortMode = homeSortMode,
+                searchQuery = searchQuery,
                 onClick = { pkg -> viewModel.launchWithVpn(pkg) },
                 onLongClick = { pkg -> menuApp = pkg },
                 onAdd = { addingToGroup = AppGroup.LAUNCH_VPN }
@@ -373,6 +480,8 @@ fun HomeScreen(
                 tintColor = MaterialTheme.colorScheme.tertiary,
                 viewModel = viewModel,
                 frozenVersion = frozenVersion,
+                sortMode = homeSortMode,
+                searchQuery = searchQuery,
                 onClick = { pkg -> viewModel.launchWithVpn(pkg) },
                 onLongClick = { pkg -> menuApp = pkg },
                 onAdd = { addingToGroup = AppGroup.VPN_ONLY }
@@ -627,10 +736,41 @@ private fun AppGroupSection(
     tintColor: Color,
     viewModel: MainViewModel,
     frozenVersion: Long,
+    sortMode: HomeSortMode,
+    searchQuery: String,
     onClick: (String) -> Unit,
     onLongClick: (String) -> Unit,
     onAdd: () -> Unit,
 ) {
+    val pm = LocalContext.current.packageManager
+    // Label lookup is the expensive part (PackageManager IPC). Cache once per
+    // group and reuse for filter + sort — otherwise typing each character would
+    // trigger 50+ PM calls per group.
+    val labelledApps = remember(apps) {
+        apps.map { app ->
+            val label = runCatching {
+                pm.getApplicationInfo(app.packageName, 0).loadLabel(pm).toString()
+            }.getOrDefault(app.packageName)
+            app to label
+        }
+    }
+    val q = searchQuery.trim()
+    val visibleApps = remember(labelledApps, sortMode, q) {
+        val filtered = if (q.isEmpty()) labelledApps else labelledApps.filter { (app, label) ->
+            app.packageName.contains(q, ignoreCase = true) || label.contains(q, ignoreCase = true)
+        }
+        when (sortMode) {
+            HomeSortMode.NAME -> filtered.sortedBy { it.second.lowercase() }
+            HomeSortMode.PACKAGE -> filtered.sortedBy { it.first.packageName.lowercase() }
+        }.map { it.first }
+    }
+
+    // Hide the whole section while a search is active and this group has no
+    // matches — otherwise the screen would be a wall of empty group headers.
+    // With an empty query, a real (just empty) group still renders so the user
+    // can use the "+" button to add the first app.
+    if (q.isNotEmpty() && visibleApps.isEmpty()) return
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -655,19 +795,7 @@ private fun AppGroupSection(
     }
     Spacer(Modifier.height(8.dp))
 
-    val pm = LocalContext.current.packageManager
-    val sortedApps = remember(apps) {
-        apps.sortedBy { app ->
-            try {
-                pm.getApplicationInfo(app.packageName, 0)
-                    .loadLabel(pm).toString().lowercase()
-            } catch (e: Exception) {
-                app.packageName.lowercase()
-            }
-        }
-    }
-
-    val rows = (sortedApps.size + 3) / 4
+    val rows = (visibleApps.size + 3) / 4
     val gridHeight = if (rows == 0) 0.dp else (rows * 88 - 8).dp
 
     LazyVerticalGrid(
@@ -677,7 +805,7 @@ private fun AppGroupSection(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         userScrollEnabled = false
     ) {
-        items(sortedApps, key = { "${it.packageName}_$frozenVersion" }) { app ->
+        items(visibleApps, key = { "${it.packageName}_$frozenVersion" }) { app ->
             val isFrozen = viewModel.isAppFrozen(app.packageName)
             AppIconItem(
                 packageName = app.packageName,

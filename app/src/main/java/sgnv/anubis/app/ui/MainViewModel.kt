@@ -17,6 +17,7 @@ import sgnv.anubis.app.service.StealthState
 import sgnv.anubis.app.service.StealthVpnService
 import sgnv.anubis.app.service.VpnMonitorService
 import sgnv.anubis.app.settings.AppSettings
+import sgnv.anubis.app.settings.HomeSortMode
 import sgnv.anubis.app.shizuku.ShizukuStatus
 import sgnv.anubis.app.shizuku.shizukuUnavailableMessageRes
 import sgnv.anubis.app.update.UpdateChecker
@@ -72,6 +73,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Master pause: orchestrator stops reacting to external VPN-up/down (#145). */
     val paused: StateFlow<Boolean> = orchestrator.paused
     fun setPaused(value: Boolean) = orchestrator.setPaused(value)
+
+    /** Sort order for app icons inside groups on HomeScreen (#56). */
+    private val _homeSortMode = MutableStateFlow(HomeSortMode.load(application))
+    val homeSortMode: StateFlow<HomeSortMode> = _homeSortMode
+    fun setHomeSortMode(mode: HomeSortMode) {
+        _homeSortMode.value = mode
+        HomeSortMode.save(getApplication(), mode)
+    }
 
     /** Easter-egg: "Заморожено N за X с" / "Разморожено ..." — direct pass-through. */
     val benchmark: SharedFlow<String> = orchestrator.benchmark

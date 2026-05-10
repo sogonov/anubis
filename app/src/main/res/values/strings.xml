@@ -62,6 +62,7 @@
     <string name="home_status_enabling">ВКЛЮЧЕНИЕ...</string>
     <string name="home_status_unfreezing">РАЗМОРОЗКА...</string>
     <string name="home_cancel_transition">Отменить операцию</string>
+    <string name="home_sort_cd">Сортировка</string>
 
     <string name="paused_banner_title">Anubis приостановлен</string>
     <string name="paused_banner_subtitle">Заморозки по VPN не срабатывают. Ручные действия и переключатель защиты работают.</string>
