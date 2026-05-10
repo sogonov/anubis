@@ -603,9 +603,16 @@ class StealthOrchestrator(
 
     private suspend fun fail(message: String) {
         _progressText.value = null
-        freezeSelectedVpnClientIfNeeded()
+        // Restore the DISABLED state cleanly. enableImpl froze LOCAL and
+        // LOCAL_AUTO_UNFREEZE before starting the VPN — if startVPN errors or
+        // waitForVpnOn times out, those groups stay frozen even though the user
+        // is back to a VPN-off state where LOCAL_AUTO_UNFREEZE should be thawed
+        // (#99 — "apps stayed frozen after a failed VPN start"). The canonical
+        // DISABLED-state application (re-freeze idle client, unfreeze
+        // LOCAL_AUTO_UNFREEZE, set _state) handles all of it; it's the same path
+        // we run on user-cancelled enable().
+        applyManagedStateForVpn(active = false)
         _lastError.value = message
-        _state.value = StealthState.DISABLED
     }
 
     private suspend fun freezeSelectedVpnClientIfNeeded() {
