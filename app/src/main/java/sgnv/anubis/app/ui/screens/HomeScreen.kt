@@ -18,16 +18,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -129,6 +132,7 @@ fun HomeScreen(
     var searchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val searchFocusRequester = remember { FocusRequester() }
+    var showNetworkDialog by remember { mutableStateOf(false) }
 
     val statusColor by animateColorAsState(
         when (stealthState) {
@@ -382,9 +386,53 @@ fun HomeScreen(
         } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Network status pill — used to be a full Card at the bottom of the
+                // screen, but with many groups the user rarely scrolled that far.
+                // Inline pill keeps it visible and turns the otherwise empty left
+                // half of this row into something useful. Tap → AlertDialog with
+                // full info + refresh.
+                val ni = networkInfo
+                val pillText = when {
+                    networkLoading -> "Проверяем..."
+                    ni != null -> {
+                        val parts = buildList {
+                            if (ni.pingMs > 0) add("${ni.pingMs} мс")
+                            if (ni.country.isNotBlank()) add(ni.country)
+                        }
+                        parts.joinToString(" · ").ifEmpty { "Сеть" }
+                    }
+                    else -> "Проверить сеть"
+                }
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { showNetworkDialog = true }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (networkLoading) {
+                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            Icons.Filled.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        pillText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 IconButton(onClick = { searchActive = true }) {
                     Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.common_search))
                 }
@@ -487,10 +535,6 @@ fun HomeScreen(
                 onAdd = { addingToGroup = AppGroup.VPN_ONLY }
             )
 
-        // Network
-        Spacer(Modifier.height(16.dp))
-        NetworkCard(viewModel, networkInfo, networkLoading)
-
         // Recovery hint — only shown when there are disabled user apps on device
         if (hasDisabledUserApps) {
             Spacer(Modifier.height(16.dp))
@@ -530,6 +574,49 @@ fun HomeScreen(
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+
+    // Network info dialog — opened by tapping the inline pill in the search row.
+    if (showNetworkDialog) {
+        val ni = networkInfo
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showNetworkDialog = false },
+            title = { Text("Сеть") },
+            text = {
+                Column {
+                    when {
+                        networkLoading -> Text(
+                            "Проверяем соединение...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        ni != null -> {
+                            if (ni.pingMs > 0) InfoRow("Ping", "${ni.pingMs} мс")
+                            if (ni.country.isNotBlank()) {
+                                val loc = if (ni.city.isNotBlank()) "${ni.country}, ${ni.city}" else ni.country
+                                InfoRow("Локация", loc)
+                            }
+                            if (ni.ip.isNotBlank()) InfoRow("IP", ni.ip)
+                            if (ni.org.isNotBlank()) InfoRow("Провайдер", ni.org)
+                        }
+                        else -> Text(
+                            "Нажмите «Обновить», чтобы проверить соединение.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.refreshNetworkInfo() },
+                    enabled = !networkLoading
+                ) { Text("Обновить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNetworkDialog = false }) { Text("Закрыть") }
+            }
+        )
     }
 
     // Dangerous app warning
@@ -863,50 +950,6 @@ private fun AppIconItem(
             color = if (isFrozen) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             else MaterialTheme.colorScheme.onSurface
         )
-    }
-}
-
-@Composable
-private fun NetworkCard(
-    viewModel: MainViewModel,
-    networkInfo: sgnv.anubis.app.data.model.NetworkInfo?,
-    networkLoading: Boolean
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Сеть", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Button(
-                    onClick = { viewModel.refreshNetworkInfo() },
-                    enabled = !networkLoading,
-                    modifier = Modifier.height(32.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                ) {
-                    if (networkLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    else Text("Проверить", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            if (networkLoading) {
-                Text("Проверяем соединение...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else if (networkInfo != null) {
-                if (networkInfo.pingMs > 0) InfoRow("Ping", "${networkInfo.pingMs} мс")
-                if (networkInfo.country.isNotBlank()) {
-                    val loc = if (networkInfo.city.isNotBlank()) "${networkInfo.country}, ${networkInfo.city}" else networkInfo.country
-                    InfoRow("Локация", loc)
-                }
-                var showDetails by remember { mutableStateOf(false) }
-                if (showDetails) {
-                    InfoRow("IP", networkInfo.ip)
-                    if (networkInfo.org.isNotBlank()) InfoRow("Провайдер", networkInfo.org)
-                }
-                TextButton(onClick = { showDetails = !showDetails }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (showDetails) "Скрыть детали" else "Показать IP и провайдер", style = MaterialTheme.typography.labelSmall)
-                }
-            } else {
-                Text("Нажмите «Проверить»", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
     }
 }
 

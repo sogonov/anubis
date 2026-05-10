@@ -49,6 +49,8 @@ import sgnv.anubis.app.ui.util.renderToBitmap
 
 private const val TAG = "MainViewModel"
 
+private const val METADATA_URL = "https://ipinfo.io/json"
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as AnubisApp
@@ -632,10 +634,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun fetchNetworkInfo(): NetworkInfo? = withContext(Dispatchers.IO) {
+        // Two-pass HTTPS round-trip. The first pass warms up DNS resolution,
+        // TCP handshake, TLS handshake, cert validation, and any OCSP lookup —
+        // its timing is thrown away because on a cold connection it can clock
+        // 5+ seconds and isn't representative of "ping". The second pass runs
+        // through HttpURLConnection's keep-alive pool and reflects the real
+        // round-trip time the user would experience in a browser, typically
+        // 150–400 ms. TCP-only connects to anycast hosts looked technically
+        // correct (1–5 ms to Cloudflare/Google PoPs) but matched neither user
+        // expectation nor what VPN clients display.
         try {
-            val start = System.currentTimeMillis()
-            val json = URL("https://ipinfo.io/json").readText()
-            val pingMs = System.currentTimeMillis() - start
+            URL(METADATA_URL).readText()  // warm-up, result discarded
+        } catch (_: Exception) {
+            // If the warm-up fails we'll catch it again below; nothing to do here.
+        }
+        val timed = try {
+            val start = System.nanoTime()
+            val json = URL(METADATA_URL).readText()
+            val pingMs = (System.nanoTime() - start) / 1_000_000
             val obj = JSONObject(json)
             NetworkInfo(
                 ip = obj.optString("ip", "?"),
@@ -644,15 +660,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 org = obj.optString("org", ""),
                 pingMs = pingMs
             )
-        } catch (e: Exception) {
-            try {
-                val start = System.currentTimeMillis()
-                val ip = URL("https://api.ipify.org").readText().trim()
-                val pingMs = System.currentTimeMillis() - start
-                NetworkInfo(ip = ip, pingMs = pingMs)
-            } catch (e2: Exception) {
-                null
-            }
+        } catch (_: Exception) {
+            null
+        }
+        if (timed != null) return@withContext timed
+        // Fallback if ipinfo.io is unreachable — at least surface the public IP.
+        try {
+            val start = System.nanoTime()
+            val ip = URL("https://api.ipify.org").readText().trim()
+            val pingMs = (System.nanoTime() - start) / 1_000_000
+            NetworkInfo(ip = ip, pingMs = pingMs)
+        } catch (_: Exception) {
+            null
         }
     }
 
