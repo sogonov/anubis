@@ -19,6 +19,7 @@ object AppSettings {
     const val KEY_LAUNCHER_SAFE_MODE = "launcher_safe_mode"
     const val KEY_PAUSED = "paused"
     const val KEY_HOME_SORT_MODE = "home_sort_mode"
+    const val KEY_IGNORED_VPN_PACKAGES = "ignored_vpn_packages"
     private const val KEY_VPN_CLIENT_AUTOMATION_TOKEN_PREFIX = "vpn_client_automation_token_"
     private const val TAG = "AppSettings"
 
@@ -28,6 +29,25 @@ object AppSettings {
     fun prefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
+
+    fun ignoredVpnPackages(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_IGNORED_VPN_PACKAGES, emptySet())?.toSet().orEmpty()
+
+    fun setIgnoredVpnPackages(context: Context, packages: Set<String>) {
+        prefs(context).edit { putStringSet(KEY_IGNORED_VPN_PACKAGES, packages.toSet()) }
+    }
+
+    fun isIgnoredVpnPackage(context: Context, packageName: String?): Boolean =
+        packageName != null &&
+            packageName != selectedVpnPackage(context) &&
+            packageName in ignoredVpnPackages(context)
+
+    private fun selectedVpnPackage(context: Context): String =
+        prefs(context).getString(KEY_VPN_CLIENT_PACKAGE, null)
+            ?: prefs(context).getString("vpn_client", null)?.let {
+                runCatching { VpnClientType.valueOf(it).packageName }.getOrNull()
+            }
+            ?: VpnClientType.V2RAY_NG.packageName
 
     private fun securePrefs(context: Context): SharedPreferences? {
         securePrefsCache?.let { return it }
@@ -95,13 +115,7 @@ object AppSettings {
         context: Context,
         packageNameOverride: String? = null,
     ): SelectedVpnClient {
-        val prefs = prefs(context)
-        val packageName = packageNameOverride
-            ?: prefs.getString(KEY_VPN_CLIENT_PACKAGE, null)
-            ?: prefs.getString("vpn_client", null)?.let {
-                runCatching { VpnClientType.valueOf(it).packageName }.getOrNull()
-            }
-            ?: VpnClientType.V2RAY_NG.packageName
+        val packageName = packageNameOverride ?: selectedVpnPackage(context)
         return SelectedVpnClient.fromPackage(
             pkg = packageName,
             automationToken = getVpnClientAutomationToken(context, packageName),

@@ -38,9 +38,6 @@ class StealthTileService : TileService() {
             return
         }
 
-        val willBeActive = !isVpnActive()
-        updateTile(isActive = willBeActive)
-
         val vpnClientManager = app.vpnClientManager
         val orchestrator = app.orchestrator
 
@@ -50,6 +47,10 @@ class StealthTileService : TileService() {
         scope.launch {
             try {
                 shizukuManager.awaitUserService()
+                vpnClientManager.refreshVpnState()
+                vpnClientManager.detectActiveVpnClient()
+                val willBeActive = !isVpnActive()
+                updateTile(isActive = willBeActive)
 
                 withTimeoutOrNull(TOTAL_TOGGLE_TIMEOUT_MS) {
                     if (willBeActive) {
@@ -82,7 +83,7 @@ class StealthTileService : TileService() {
 
     private fun isVpnActive(): Boolean {
         val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        return try {
+        val physicallyActive = try {
             cm.allNetworks.any { network ->
                 cm.getNetworkCapabilities(network)
                     ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
@@ -90,6 +91,8 @@ class StealthTileService : TileService() {
         } catch (e: Exception) {
             false
         }
+        val owner = (application as AnubisApp).vpnClientManager.activeVpnPackage.value
+        return physicallyActive && !AppSettings.isIgnoredVpnPackage(this, owner)
     }
 
     override fun onDestroy() {
