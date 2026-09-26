@@ -37,6 +37,7 @@ class BackupRepository(
             backgroundMonitoring = prefs.optBooleanOrNull(AppSettings.KEY_BACKGROUND_MONITORING),
             freezeOnBoot = prefs.optBooleanOrNull(AppSettings.KEY_FREEZE_ON_BOOT),
             launcherSafeMode = prefs.optBooleanOrNull(AppSettings.KEY_LAUNCHER_SAFE_MODE),
+            ignoredVpnPackages = AppSettings.ignoredVpnPackages(context).sorted(),
         )
 
         val backup = AppConfigBackup(
@@ -103,6 +104,10 @@ class BackupRepository(
             }
             settings.launcherSafeMode?.let {
                 putBoolean(AppSettings.KEY_LAUNCHER_SAFE_MODE, it)
+                applied++
+            }
+            settings.ignoredVpnPackages?.let {
+                putStringSet(AppSettings.KEY_IGNORED_VPN_PACKAGES, it.toSet())
                 applied++
             }
         }

@@ -12,19 +12,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,6 +61,11 @@ fun SettingsScreen(
 ) {
     val shizukuStatus by viewModel.shizukuStatus.collectAsState()
     val launcherSafeMode by viewModel.launcherSafeMode.collectAsState()
+    val ignoredVpnPackages by viewModel.ignoredVpnPackages.collectAsState()
+    val installedApps by viewModel.installedApps.collectAsState()
+    val selectedVpnClient by viewModel.selectedVpnClient.collectAsState()
+    var showVpnExclusions by remember { mutableStateOf(false) }
+    var exclusionQuery by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -96,6 +106,96 @@ fun SettingsScreen(
                     onCheckedChange = { viewModel.setBackgroundMonitoring(it) }
                 )
             }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(modifier = Modifier.fillMaxWidth().clickable { showVpnExclusions = true }) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Игнорировать VPN-приложения", style = typography.bodyMedium)
+                    Text(
+                        "Подключение выбранных приложений не меняет группы Anubis. " +
+                            "Исключено: ${ignoredVpnPackages.size}",
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (showVpnExclusions) {
+            val query = exclusionQuery.trim()
+            val choices = installedApps
+                .filter { !it.isSystem && !it.isDisabled }
+                .filter {
+                    query.isBlank() || it.label.contains(query, ignoreCase = true) ||
+                        it.packageName.contains(query, ignoreCase = true)
+                }
+                .sortedWith(compareByDescending<sgnv.anubis.app.data.model.InstalledAppInfo> {
+                    it.packageName in ignoredVpnPackages
+                }.thenBy { it.label.lowercase() })
+
+            AlertDialog(
+                onDismissRequest = { showVpnExclusions = false },
+                title = { Text("Игнорировать VPN-приложения") },
+                text = {
+                    Column {
+                        Text(
+                            "Например, AdGuard с локальным VPN. Выбранный для управления " +
+                                "VPN-клиент исключить нельзя. Android по-прежнему считает " +
+                                "исключённое подключение VPN, а приложения могут его обнаружить.",
+                            style = typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = exclusionQuery,
+                            onValueChange = { exclusionQuery = it },
+                            label = { Text("Поиск приложения") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                            items(choices, key = { it.packageName }) { appInfo ->
+                                val selectable = appInfo.packageName != selectedVpnClient.packageName
+                                val checked = appInfo.packageName in ignoredVpnPackages
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable(enabled = selectable) {
+                                        viewModel.setVpnIgnored(appInfo.packageName, !checked)
+                                    }.padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = checked,
+                                        onCheckedChange = { viewModel.setVpnIgnored(appInfo.packageName, it) },
+                                        enabled = selectable
+                                    )
+                                    Column {
+                                        Text(appInfo.label, style = typography.bodyMedium)
+                                        Text(
+                                            appInfo.packageName,
+                                            style = typography.bodySmall,
+                                            color = colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showVpnExclusions = false }) { Text("Готово") }
+                }
+            )
         }
 
         Spacer(Modifier.height(12.dp))
