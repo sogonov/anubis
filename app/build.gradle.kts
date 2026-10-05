@@ -1,6 +1,8 @@
 import java.util.Properties
 
-// CI passes github.run_number; it is the nightly's versionCode and update counter.
+// Nightly is identified by its commit; CI also passes github.run_number, which only
+// serves as versionCode so that each nightly installs over the previous one.
+val nightlySha = System.getenv("GITHUB_SHA")?.take(7) ?: "local"
 val nightlyBuild = System.getenv("NIGHTLY_BUILD")?.toIntOrNull() ?: 0
 
 plugins {
@@ -21,7 +23,7 @@ android {
         versionCode = 11
         versionName = "0.1.6-beta.1"
         buildConfigField("boolean", "IS_NIGHTLY", "false")
-        buildConfigField("int", "NIGHTLY_BUILD", "0")
+        buildConfigField("String", "NIGHTLY_SHA", "\"\"")
     }
 
     signingConfigs {
@@ -60,11 +62,11 @@ android {
         create("nightly") {
             initWith(getByName("release"))
             applicationIdSuffix = ".nightly"
-            versionNameSuffix = "-nightly.$nightlyBuild"
+            versionNameSuffix = "-nightly.$nightlySha"
             // Local builds without the CI key fall back to the debug key.
             signingConfig = signingConfigs.findByName("nightly") ?: signingConfigs.getByName("debug")
             buildConfigField("boolean", "IS_NIGHTLY", "true")
-            buildConfigField("int", "NIGHTLY_BUILD", "$nightlyBuild")
+            buildConfigField("String", "NIGHTLY_SHA", "\"$nightlySha\"")
         }
     }
 
@@ -73,8 +75,8 @@ android {
         variant.outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
             output.outputFileName = if (variant.buildType.name == "nightly") {
-                // UpdateChecker reads the build number from this name.
-                "anubis-nightly.$nightlyBuild.apk"
+                // UpdateChecker reads the commit from this name.
+                "anubis-nightly-$nightlySha.apk"
             } else {
                 "anubis-${variant.versionName}-${variant.name}.apk"
             }

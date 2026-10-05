@@ -55,10 +55,9 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        APK="app/build/outputs/apk/nightly/anubis-nightly.${{ github.run_number }}.apk"
+        APK="app/build/outputs/apk/nightly/anubis-nightly-${GITHUB_SHA::7}.apk"
         NOTES="Automated build of the latest main. Separate app (sgnv.anubis.app.nightly), updates itself from this release.
 
-        Build: ${{ github.run_number }}
         Commit: ${GITHUB_SHA::7}
         Built on: $(date -u +'%Y-%m-%d %H:%M:%S') UTC"
 

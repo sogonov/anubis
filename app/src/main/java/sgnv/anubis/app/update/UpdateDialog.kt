@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import sgnv.anubis.app.BuildConfig
 
 @Composable
 fun UpdateDialog(
@@ -23,14 +24,16 @@ fun UpdateDialog(
     onSkip: () -> Unit,
 ) {
     val context = LocalContext.current
+    // Nightly versions read "nightly <sha>", not a number.
+    val versionPrefix = if (BuildConfig.IS_NIGHTLY) "" else "v"
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Доступно обновление: v${info.latestVersion}") },
+        title = { Text("Доступно обновление: ${versionPrefix}${info.latestVersion}") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "Текущая версия: v${info.currentVersion}",
+                    "Текущая версия: ${versionPrefix}${info.currentVersion}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

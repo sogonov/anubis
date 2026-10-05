@@ -16,7 +16,7 @@ import java.net.URL
  * Stable-only: https://api.github.com/repos/<owner>/<repo>/releases/latest
  * Включая бета: https://api.github.com/repos/<owner>/<repo>/releases?per_page=5 (берём первый)
  * Nightly-сборка: https://api.github.com/repos/<owner>/<repo>/releases/tags/nightly,
- * сравнивается номер сборки из имени APK (anubis-nightly.<N>.apk).
+ * обновление есть, если коммит в имени APK (anubis-nightly-<sha>.apk) отличается от своего.
  * Лимит без токена: 60 req/hour/IP. Для нашего масштаба достаточно.
  *
  * Релиз nightly живёт в том же репозитории, его тег стоит на первом коммите, поэтому в
@@ -29,7 +29,7 @@ object UpdateChecker {
     private const val API_LIST_URL = "https://api.github.com/repos/sogonov/anubis/releases?per_page=5"
     private const val API_NIGHTLY_URL = "https://api.github.com/repos/sogonov/anubis/releases/tags/nightly"
     private const val NIGHTLY_TAG = "nightly"
-    private val NIGHTLY_APK_REGEX = Regex("""anubis-nightly\.(\d+)\.apk""", RegexOption.IGNORE_CASE)
+    private val NIGHTLY_APK_REGEX = Regex("""anubis-nightly-([0-9a-f]+)\.apk""", RegexOption.IGNORE_CASE)
     private const val PREFS = "settings"
     private const val KEY_ENABLED = "update_check_enabled"
     private const val KEY_INCLUDE_PRERELEASES = "update_include_prereleases"
@@ -138,12 +138,13 @@ object UpdateChecker {
             prefs.edit { putLong(KEY_LAST_CHECK_MS, now) }
 
             if (BuildConfig.IS_NIGHTLY) {
-                // "nightly.<N>" compares numerically in UpdateInfo.compareVersions.
-                val build = apkUrl?.let { NIGHTLY_APK_REGEX.find(it) }?.groupValues?.get(1)
+                // The nightly release always carries the latest main, so any other
+                // commit than ours is newer (see UpdateInfo.isUpdateAvailable).
+                val sha = apkUrl?.let { NIGHTLY_APK_REGEX.find(it) }?.groupValues?.get(1)
                     ?: return@withContext null
                 return@withContext UpdateInfo(
-                    latestVersion = "nightly.$build",
-                    currentVersion = "nightly.${BuildConfig.NIGHTLY_BUILD}",
+                    latestVersion = "nightly $sha",
+                    currentVersion = "nightly ${BuildConfig.NIGHTLY_SHA}",
                     releaseUrl = htmlUrl,
                     apkUrl = apkUrl,
                     releaseNotes = notes,
@@ -168,6 +169,7 @@ object UpdateChecker {
     fun shouldNotify(context: Context, info: UpdateInfo): Boolean {
         if (!info.isUpdateAvailable) return false
         val skipped = skippedVersion(context) ?: return true
+        if (BuildConfig.IS_NIGHTLY) return info.latestVersion != skipped
         return UpdateInfo.compareVersions(info.latestVersion, skipped) > 0
     }
 }

@@ -1,5 +1,7 @@
 package sgnv.anubis.app.update
 
+import sgnv.anubis.app.BuildConfig
+
 data class UpdateInfo(
     val latestVersion: String,
     val currentVersion: String,
@@ -7,7 +9,9 @@ data class UpdateInfo(
     val apkUrl: String?,
     val releaseNotes: String,
 ) {
-    val isUpdateAvailable: Boolean get() = compareVersions(latestVersion, currentVersion) > 0
+    val isUpdateAvailable: Boolean get() =
+        if (BuildConfig.IS_NIGHTLY) latestVersion != currentVersion
+        else compareVersions(latestVersion, currentVersion) > 0
 
     companion object {
         /**
