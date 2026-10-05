@@ -1,0 +1,77 @@
+name: Nightly
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'img/**'
+  workflow_dispatch:
+
+# A newer push supersedes the build in flight.
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0  # the nightly tag goes on the root commit, see below
+
+    - uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    - uses: gradle/actions/setup-gradle@v6
+
+    - name: Decode nightly key
+      env:
+        NIGHTLY_KEYSTORE_BASE64: ${{ secrets.NIGHTLY_KEYSTORE_BASE64 }}
+      run: echo "$NIGHTLY_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/nightly.keystore"
+
+    - name: Build
+      env:
+        NIGHTLY_BUILD: ${{ github.run_number }}
+        NIGHTLY_STORE_FILE: ${{ runner.temp }}/nightly.keystore
+        NIGHTLY_STORE_PASSWORD: ${{ secrets.NIGHTLY_STORE_PASSWORD }}
+        NIGHTLY_KEY_ALIAS: ${{ secrets.NIGHTLY_KEY_ALIAS }}
+        NIGHTLY_KEY_PASSWORD: ${{ secrets.NIGHTLY_KEY_PASSWORD }}
+      run: ./gradlew assembleNightly
+
+    # Installed apps up to 0.1.6-beta.1 take the first entry of /releases as the
+    # newest release. GitHub orders releases by the date of the tagged commit, so
+    # the nightly tag sits on the root commit and is never moved: the release stays
+    # at the bottom of the list. Its contents are replaced in place instead of
+    # recreating it (as f4 does to keep its nightly on top).
+    - name: Publish
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        APK="app/build/outputs/apk/nightly/anubis-nightly.${{ github.run_number }}.apk"
+        NOTES="Automated build of the latest main. Separate app (sgnv.anubis.app.nightly), updates itself from this release.
+
+        Build: ${{ github.run_number }}
+        Commit: ${GITHUB_SHA::7}
+        Built on: $(date -u +'%Y-%m-%d %H:%M:%S') UTC"
+
+        if ! gh release view nightly >/dev/null 2>&1; then
+          ROOT=$(git rev-list --max-parents=0 HEAD | tail -n1)
+          gh release create nightly "$APK" --target "$ROOT" --prerelease \
+            --title "Continuous Build (Nightly)" --notes "$NOTES"
+          exit 0
+        fi
+
+        # Upload first, so the release never goes without an APK.
+        gh release upload nightly "$APK" --clobber
+        for old in $(gh release view nightly --json assets --jq '.assets[].name'); do
+          [ "$old" = "$(basename "$APK")" ] || gh release delete-asset nightly "$old" --yes
+        done
+        gh release edit nightly --notes "$NOTES"

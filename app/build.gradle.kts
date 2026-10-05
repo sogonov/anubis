@@ -1,5 +1,8 @@
 import java.util.Properties
 
+// CI passes github.run_number; it is the nightly's versionCode and update counter.
+val nightlyBuild = System.getenv("NIGHTLY_BUILD")?.toIntOrNull() ?: 0
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -17,6 +20,8 @@ android {
         targetSdk = 34
         versionCode = 11
         versionName = "0.1.6-beta.1"
+        buildConfigField("boolean", "IS_NIGHTLY", "false")
+        buildConfigField("int", "NIGHTLY_BUILD", "0")
     }
 
     signingConfigs {
@@ -29,6 +34,16 @@ android {
             keyAlias = props.getProperty("keyAlias", "")
             keyPassword = props.getProperty("keyPassword", "")
         }
+        // Nightly key comes from CI env (see .github/workflows/nightly.yml); it is
+        // deliberately separate from the release key.
+        System.getenv("NIGHTLY_STORE_FILE")?.let { nightlyStoreFile ->
+            create("nightly") {
+                storeFile = file(nightlyStoreFile)
+                storePassword = System.getenv("NIGHTLY_STORE_PASSWORD")
+                keyAlias = System.getenv("NIGHTLY_KEY_ALIAS")
+                keyPassword = System.getenv("NIGHTLY_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -40,13 +55,29 @@ android {
                 "proguard-rules.pro"
             )
         }
+        // Separate package with its own key and self-update channel (the "nightly"
+        // GitHub release); stable and beta distribution is untouched.
+        create("nightly") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".nightly"
+            versionNameSuffix = "-nightly.$nightlyBuild"
+            // Local builds without the CI key fall back to the debug key.
+            signingConfig = signingConfigs.findByName("nightly") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "IS_NIGHTLY", "true")
+            buildConfigField("int", "NIGHTLY_BUILD", "$nightlyBuild")
+        }
     }
 
     applicationVariants.all {
         val variant = this
         variant.outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "anubis-${variant.versionName}-${variant.name}.apk"
+            output.outputFileName = if (variant.buildType.name == "nightly") {
+                // UpdateChecker reads the build number from this name.
+                "anubis-nightly.$nightlyBuild.apk"
+            } else {
+                "anubis-${variant.versionName}-${variant.name}.apk"
+            }
         }
     }
 
@@ -63,6 +94,12 @@ android {
         compose = true
         aidl = true
         buildConfig = true
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("nightly")) { variant ->
+        variant.outputs.forEach { it.versionCode.set(maxOf(nightlyBuild, 1)) }
     }
 }
 

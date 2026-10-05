@@ -442,7 +442,8 @@ fun SettingsScreen(
                     )
                 }
 
-                if (updateCheckEnabled) {
+                // Nightly always follows the nightly channel; the beta switch does not apply.
+                if (updateCheckEnabled && !sgnv.anubis.app.BuildConfig.IS_NIGHTLY) {
                     Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),

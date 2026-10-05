@@ -15,12 +15,21 @@ import java.net.URL
  *
  * Stable-only: https://api.github.com/repos/<owner>/<repo>/releases/latest
  * Включая бета: https://api.github.com/repos/<owner>/<repo>/releases?per_page=5 (берём первый)
+ * Nightly-сборка: https://api.github.com/repos/<owner>/<repo>/releases/tags/nightly,
+ * сравнивается номер сборки из имени APK (anubis-nightly.<N>.apk).
  * Лимит без токена: 60 req/hour/IP. Для нашего масштаба достаточно.
+ *
+ * Релиз nightly живёт в том же репозитории, его тег стоит на первом коммите, поэтому в
+ * списке /releases он внизу. Сборки до 0.1.6-beta.1 берут первый элемент списка вслепую
+ * и полагаются на этот порядок; новые явно пропускают тег nightly.
  */
 object UpdateChecker {
 
     private const val API_LATEST_URL = "https://api.github.com/repos/sogonov/anubis/releases/latest"
     private const val API_LIST_URL = "https://api.github.com/repos/sogonov/anubis/releases?per_page=5"
+    private const val API_NIGHTLY_URL = "https://api.github.com/repos/sogonov/anubis/releases/tags/nightly"
+    private const val NIGHTLY_TAG = "nightly"
+    private val NIGHTLY_APK_REGEX = Regex("""anubis-nightly\.(\d+)\.apk""", RegexOption.IGNORE_CASE)
     private const val PREFS = "settings"
     private const val KEY_ENABLED = "update_check_enabled"
     private const val KEY_INCLUDE_PRERELEASES = "update_include_prereleases"
@@ -78,7 +87,11 @@ object UpdateChecker {
         }
 
         val includePrereleases = isIncludePrereleases(context)
-        val apiUrl = if (includePrereleases) API_LIST_URL else API_LATEST_URL
+        val apiUrl = when {
+            BuildConfig.IS_NIGHTLY -> API_NIGHTLY_URL
+            includePrereleases -> API_LIST_URL
+            else -> API_LATEST_URL
+        }
 
         try {
             val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
@@ -92,10 +105,14 @@ object UpdateChecker {
             if (code !in 200..299) return@withContext null
 
             val body = conn.inputStream.bufferedReader().use { it.readText() }
-            // /releases/latest returns a single object; /releases returns an array sorted
-            // by created_at desc — first element is the most recent regardless of prerelease.
-            val release = if (includePrereleases) {
-                JSONArray(body).takeIf { it.length() > 0 }?.getJSONObject(0)
+            // /releases/latest and /releases/tags/nightly return a single object; /releases
+            // returns an array sorted by created_at desc — the first non-nightly element is
+            // the most recent regardless of prerelease.
+            val release = if (includePrereleases && !BuildConfig.IS_NIGHTLY) {
+                val releases = JSONArray(body)
+                (0 until releases.length())
+                    .map { releases.getJSONObject(it) }
+                    .firstOrNull { it.optString("tag_name") != NIGHTLY_TAG }
             } else {
                 JSONObject(body)
             } ?: return@withContext null
@@ -119,6 +136,19 @@ object UpdateChecker {
             }
 
             prefs.edit { putLong(KEY_LAST_CHECK_MS, now) }
+
+            if (BuildConfig.IS_NIGHTLY) {
+                // "nightly.<N>" compares numerically in UpdateInfo.compareVersions.
+                val build = apkUrl?.let { NIGHTLY_APK_REGEX.find(it) }?.groupValues?.get(1)
+                    ?: return@withContext null
+                return@withContext UpdateInfo(
+                    latestVersion = "nightly.$build",
+                    currentVersion = "nightly.${BuildConfig.NIGHTLY_BUILD}",
+                    releaseUrl = htmlUrl,
+                    apkUrl = apkUrl,
+                    releaseNotes = notes,
+                )
+            }
 
             UpdateInfo(
                 latestVersion = tagName,
