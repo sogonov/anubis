@@ -99,6 +99,7 @@ fun HomeScreen(
     val vpnActive by viewModel.vpnActive.collectAsState()
     val activeVpnClient by viewModel.activeVpnClient.collectAsState()
     val activeVpnPackage by viewModel.activeVpnPackage.collectAsState()
+    val ignoredVpnPackages by viewModel.ignoredVpnPackages.collectAsState()
     val networkInfo by viewModel.networkInfo.collectAsState()
     val networkLoading by viewModel.networkLoading.collectAsState()
 
@@ -238,6 +239,8 @@ fun HomeScreen(
                     )
                     Text(
                         when {
+                            vpnActive && activeVpnPackage?.let { it in ignoredVpnPackages } == true ->
+                                "VPN: $activeVpnPackage (игнорируется)"
                             vpnActive && activeVpnClient != null -> "VPN: ${activeVpnClient!!.fullDisplayName}"
                             vpnActive && activeVpnPackage != null -> "VPN: $activeVpnPackage"
                             vpnActive -> "VPN активен"
@@ -974,4 +977,3 @@ private fun InfoRow(label: String, value: String) {
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
 }
-

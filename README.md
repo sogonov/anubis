@@ -21,9 +21,15 @@ Unlike sandbox-based solutions (Island, Insular, Shelter), which only isolate ap
 - **Quick Settings tile** — toggle from notification shade
 - **Auto-freeze on boot** and on app launch if VPN is already active
 - **Background VPN monitoring** — auto-freeze when VPN is toggled outside Anubis (opt-in in Settings)
+- **Ignored VPN apps** — keep group rules unchanged when a selected app (such as AdGuard) owns the VPN
 - **VPN disconnect** — multi-step: API → dummy VPN takeover → force-stop → kill
 
 ## How It Works
+
+### Ignored VPN apps
+In **Settings → Monitoring → Ignore VPN apps**, select apps whose VPN connections Anubis should treat as inactive. This applies to background monitoring, the main screen, shortcuts, and the tile/widget. The VPN client selected for Anubis control cannot be ignored. If the VPN owner cannot be identified, Anubis keeps its normal freeze behavior.
+
+Ignoring a VPN changes only Anubis's group decisions. Android and other apps can still detect or use that VPN connection.
 
 ### Freeze Mechanism
 Uses Shizuku to execute `pm disable-user --user 0 <package>` which completely disables an app at the OS level. The app cannot:

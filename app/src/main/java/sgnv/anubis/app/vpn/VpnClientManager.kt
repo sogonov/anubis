@@ -8,6 +8,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 import sgnv.anubis.app.shizuku.ShizukuManager
+import sgnv.anubis.app.settings.AppSettings
 import sgnv.anubis.app.util.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,7 +78,7 @@ class VpnClientManager(
                     }
                 }
                 VpnControlMode.TOGGLE -> {
-                    if (!_vpnActive.value) {
+                    if (!_vpnActive.value || isIgnoredVpnActive()) {
                         val cmd = control.buildStartCommand(client)
                         if (cmd == null) {
                             val controlError = control.buildStartCommandFailureMessage(client)
@@ -224,6 +225,19 @@ class VpnClientManager(
         val client = if (pkg != null) VpnClientType.fromPackageName(pkg) else null
         _activeVpnClient.value = client
         return client
+    }
+
+    /** An ignored local VPN remains physically active, but must not trigger group rules. */
+    suspend fun isIgnoredVpnActive(): Boolean {
+        if (!_vpnActive.value || AppSettings.ignoredVpnPackages(context).isEmpty()) return false
+        // Owner discovery can lag the network callback. Never ignore an unknown owner.
+        repeat(3) { attempt ->
+            detectActiveVpnClient()
+            val owner = _activeVpnPackage.value
+            if (owner != null) return AppSettings.isIgnoredVpnPackage(context, owner)
+            if (attempt < 2) delay(200)
+        }
+        return false
     }
 
     /**

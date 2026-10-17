@@ -24,6 +24,7 @@ data class BackupSettings(
     val backgroundMonitoring: Boolean? = null,
     val freezeOnBoot: Boolean? = null,
     val launcherSafeMode: Boolean? = null,
+    val ignoredVpnPackages: List<String>? = null,
 )
 
 sealed class ParseResult {
@@ -44,6 +45,7 @@ object AppConfigBackupSerializer {
     private const val SETTING_BACKGROUND_MONITORING = "background_monitoring"
     private const val SETTING_FREEZE_ON_BOOT = "freeze_on_boot"
     private const val SETTING_LAUNCHER_SAFE_MODE = "launcher_safe_mode"
+    private const val SETTING_IGNORED_VPN_PACKAGES = "ignored_vpn_packages"
 
     fun toJson(backup: AppConfigBackup): String {
         val root = JSONObject()
@@ -56,6 +58,11 @@ object AppConfigBackupSerializer {
         backup.settings.backgroundMonitoring?.let { settings.put(SETTING_BACKGROUND_MONITORING, it) }
         backup.settings.freezeOnBoot?.let { settings.put(SETTING_FREEZE_ON_BOOT, it) }
         backup.settings.launcherSafeMode?.let { settings.put(SETTING_LAUNCHER_SAFE_MODE, it) }
+        backup.settings.ignoredVpnPackages?.let { packages ->
+            settings.put(SETTING_IGNORED_VPN_PACKAGES, JSONArray().apply {
+                packages.forEach { put(it) }
+            })
+        }
         root.put(KEY_SETTINGS, settings)
 
         val groups = JSONObject()
@@ -91,6 +98,9 @@ object AppConfigBackupSerializer {
             backgroundMonitoring = settingsObj.optBooleanOrNull(SETTING_BACKGROUND_MONITORING),
             freezeOnBoot = settingsObj.optBooleanOrNull(SETTING_FREEZE_ON_BOOT),
             launcherSafeMode = settingsObj.optBooleanOrNull(SETTING_LAUNCHER_SAFE_MODE),
+            ignoredVpnPackages = settingsObj.optJSONArray(SETTING_IGNORED_VPN_PACKAGES)?.let { arr ->
+                (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
+            },
         )
 
         val groups = mutableMapOf<AppGroup, List<String>>()

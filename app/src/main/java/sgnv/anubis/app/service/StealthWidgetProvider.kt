@@ -10,6 +10,8 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.widget.RemoteViews
 import sgnv.anubis.app.R
+import sgnv.anubis.app.AnubisApp
+import sgnv.anubis.app.settings.AppSettings
 
 class StealthWidgetProvider : AppWidgetProvider() {
 
@@ -75,7 +77,7 @@ class StealthWidgetProvider : AppWidgetProvider() {
 
         fun isVpnActive(context: Context): Boolean {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            return try {
+            val physicallyActive = try {
                 cm.allNetworks.any { network ->
                     cm.getNetworkCapabilities(network)
                         ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
@@ -83,6 +85,9 @@ class StealthWidgetProvider : AppWidgetProvider() {
             } catch (e: Exception) {
                 false
             }
+            val owner = (context.applicationContext as AnubisApp)
+                .vpnClientManager.activeVpnPackage.value
+            return physicallyActive && !AppSettings.isIgnoredVpnPackage(context, owner)
         }
     }
 }

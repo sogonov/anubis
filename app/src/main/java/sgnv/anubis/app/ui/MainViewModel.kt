@@ -76,6 +76,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val paused: StateFlow<Boolean> = orchestrator.paused
     fun setPaused(value: Boolean) = orchestrator.setPaused(value)
 
+    private val _ignoredVpnPackages = MutableStateFlow(AppSettings.ignoredVpnPackages(application))
+    val ignoredVpnPackages: StateFlow<Set<String>> = _ignoredVpnPackages
+
+    fun setVpnIgnored(packageName: String, ignored: Boolean) {
+        if (packageName == _selectedVpnClient.value.packageName) return
+        val updated = _ignoredVpnPackages.value.toMutableSet().apply {
+            if (ignored) add(packageName) else remove(packageName)
+        }
+        AppSettings.setIgnoredVpnPackages(getApplication(), updated)
+        _ignoredVpnPackages.value = updated
+        viewModelScope.launch {
+            vpnClientManager.refreshVpnState()
+            if (vpnClientManager.vpnActive.value) orchestrator.freezeOnly()
+            orchestrator.syncState()
+        }
+    }
+
     /** Sort order for app icons inside groups on HomeScreen (#56). */
     private val _homeSortMode = MutableStateFlow(HomeSortMode.load(application))
     val homeSortMode: StateFlow<HomeSortMode> = _homeSortMode
@@ -255,7 +272,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * проходит без вопросов.
      */
     fun requestToggleAppFrozen(packageName: String) {
-        if (!isAppFrozen(packageName) || !vpnActive.value) {
+        val vpnRelevant = vpnActive.value &&
+            !AppSettings.isIgnoredVpnPackage(getApplication(), activeVpnPackage.value)
+        if (!isAppFrozen(packageName) || !vpnRelevant) {
             toggleAppFrozen(packageName)
             return
         }
@@ -504,6 +523,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .edit {
                 putString(AppSettings.KEY_VPN_CLIENT_PACKAGE, client.packageName)
             }
+        if (client.packageName in _ignoredVpnPackages.value) {
+            val updated = _ignoredVpnPackages.value - client.packageName
+            AppSettings.setIgnoredVpnPackages(getApplication(), updated)
+            _ignoredVpnPackages.value = updated
+        }
+        viewModelScope.launch {
+            vpnClientManager.refreshVpnState()
+            if (vpnClientManager.vpnActive.value) orchestrator.freezeOnly()
+            orchestrator.syncState()
+        }
     }
 
     fun updateSelectedVpnClientAutomationToken(token: String) {
@@ -600,7 +629,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         vpnClientManager.refreshVpnState()
         orchestrator.syncState()
         refreshVpnClients()
-        viewModelScope.launch { vpnClientManager.detectActiveVpnClient() }
+        viewModelScope.launch {
+            vpnClientManager.detectActiveVpnClient()
+            orchestrator.syncState()
+        }
         loadInstalledApps()
         loadGroupedApps()
         scheduleAutoFreeze()
@@ -788,6 +820,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     loadInstalledApps()
                     loadGroupedApps()
                     loadLauncherSafeMode()
+                    _ignoredVpnPackages.value = AppSettings.ignoredVpnPackages(app)
+                    vpnClientManager.refreshVpnState()
+                    if (vpnClientManager.vpnActive.value) orchestrator.freezeOnly()
+                    orchestrator.syncState()
                     loadSelectedClient()
                 }
                 .onFailure { error ->
@@ -797,4 +833,3 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
-

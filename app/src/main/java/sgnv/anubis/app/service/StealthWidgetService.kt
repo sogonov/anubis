@@ -46,8 +46,6 @@ class StealthWidgetService : Service() {
             return
         }
 
-        val willBeActive = !StealthWidgetProvider.isVpnActive(this)
-
         val vpnClientManager = app.vpnClientManager
         val orchestrator = app.orchestrator
 
@@ -56,15 +54,17 @@ class StealthWidgetService : Service() {
             ?: VpnClientType.V2RAY_NG.packageName
         val client = SelectedVpnClient.fromPackage(pkg)
 
-        StealthWidgetProvider.updateAllWidgets(
-            this,
-            if (willBeActive) "Замораживаю..." else "Отключаю VPN...",
-            StealthWidgetProvider.workingColor(this)
-        )
-
         scope.launch {
             try {
                 shizukuManager.awaitUserService()
+                vpnClientManager.refreshVpnState()
+                vpnClientManager.detectActiveVpnClient()
+                val willBeActive = !StealthWidgetProvider.isVpnActive(this@StealthWidgetService)
+                StealthWidgetProvider.updateAllWidgets(
+                    this@StealthWidgetService,
+                    if (willBeActive) "Замораживаю..." else "Отключаю VPN...",
+                    StealthWidgetProvider.workingColor(this@StealthWidgetService)
+                )
 
                 val progressJob = launch {
                     orchestrator.progressText.filterNotNull().collect { text ->

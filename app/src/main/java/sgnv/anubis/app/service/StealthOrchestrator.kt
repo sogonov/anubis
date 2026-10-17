@@ -124,7 +124,8 @@ class StealthOrchestrator(
      * Called on onResume — handles state changes made by ShortcutActivity or TileService.
      */
     fun syncState() {
-        val vpnActive = vpnClientManager.vpnActive.value
+        val vpnActive = vpnClientManager.vpnActive.value &&
+            !AppSettings.isIgnoredVpnPackage(context, vpnClientManager.activeVpnPackage.value)
         // If VPN is on, we're in stealth mode (spies should be frozen)
         // If VPN is off, stealth is disabled
         val newState = if (vpnActive) StealthState.ENABLED else StealthState.DISABLED
@@ -339,7 +340,8 @@ class StealthOrchestrator(
             || current == StealthState.DISABLING
             || current == StealthState.UNFREEZING
         ) {
-            _state.value = if (vpnClientManager.vpnActive.value) {
+            _state.value = if (vpnClientManager.vpnActive.value &&
+                !AppSettings.isIgnoredVpnPackage(context, vpnClientManager.activeVpnPackage.value)) {
                 StealthState.ENABLED
             } else {
                 StealthState.DISABLED
@@ -357,6 +359,11 @@ class StealthOrchestrator(
             return
         }
         if (!checkShizuku()) return
+        if (vpnClientManager.isIgnoredVpnActive()) {
+            AppLogger.i(TAG, "freezeOnly: ignored VPN is active")
+            applyManagedStateForVpn(active = false)
+            return
+        }
         // Handle external/manual VPN activation using the same managed-group rules.
         applyManagedStateForVpn(active = true)
     }
@@ -405,12 +412,15 @@ class StealthOrchestrator(
     ) {
         _lastError.value = null
 
-        if (_state.value == StealthState.ENABLED || vpnClientManager.vpnActive.value) {
+        val ignoredVpnActive = vpnClientManager.isIgnoredVpnActive()
+        if (!ignoredVpnActive && (_state.value == StealthState.ENABLED || vpnClientManager.vpnActive.value)) {
             disable(vpnClient, detectedPackage)
             if (vpnClientManager.vpnActive.value) {
                 _lastError.value = "Не удалось отключить VPN. Приложение не запущено. Проверьте, что Anubis имеет разрешение VPN, и что выбран правильный VPN-клиент."
                 return
             }
+        } else if (ignoredVpnActive) {
+            syncState()
         }
 
         if (shizukuManager.isAppFrozen(packageName)) {
@@ -596,7 +606,7 @@ class StealthOrchestrator(
         repeat(steps) {
             delay(200)
             vpnClientManager.refreshVpnState()
-            if (vpnClientManager.vpnActive.value) return true
+            if (vpnClientManager.vpnActive.value && !vpnClientManager.isIgnoredVpnActive()) return true
         }
         return false
     }
@@ -684,5 +694,3 @@ enum class StealthState {
     DISABLING,
     UNFREEZING
 }
-
-
