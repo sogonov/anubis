@@ -26,7 +26,7 @@ Unlike sandbox-based solutions (Island, Insular, Shelter), which only isolate ap
 ## How It Works
 
 ### Freeze Mechanism
-Uses Shizuku to execute `pm disable-user --user 0 <package>` which completely disables an app at the OS level. The app cannot:
+Uses Shizuku to force-stop the app and set `COMPONENT_ENABLED_STATE_DISABLED_USER` through Android system APIs for the current profile. Once successfully disabled, the app cannot:
 - Run any background services
 - Receive broadcasts
 - Access network interfaces
@@ -46,10 +46,28 @@ Toggle commands are unreliable for stopping (can re-enable immediately), so Anub
 2. **Dummy VPN** — establish our own VPN to revoke theirs, then close ours
 3. **`am force-stop`** — kill the detected VPN app process
 
-Apps are never unfrozen while VPN is still active.
+Local app launches verify VPN shutdown before unfreezing and again before starting the activity.
 
 ### VPN Detection
-Extracts the VPN network owner UID from `dumpsys connectivity` by matching `type: VPN[` pattern, then resolves UID → package name via `pm list packages --uid`. Works with any VPN client, including unknown/custom ones.
+Uses Android network callbacks scoped to Anubis's UID. A VPN in another Android user/work profile does not count as an active VPN for this instance. The UI, background monitor, tile and widget share the same network state; losing a network removes it directly instead of rescanning `getAllNetworks()`.
+
+**Split tunneling:** include Anubis in the VPN's app allowlist together with the apps it manages. Otherwise Android will not report that tunnel as applicable to Anubis.
+
+VPN owner detection reads `dumpsys connectivity`, filters out other Android profiles and Anubis's own dummy VPN, then resolves the UID through PackageManager. This also supports unknown/custom VPN clients.
+
+Background monitoring resumes on boot when enabled and reapplies the current policy when Shizuku becomes available. Shizuku must also be running: [Shizuku 13.6](https://github.com/RikkaApps/Shizuku/releases/tag/v13.6.0) supports automatic ADB startup on Android 13+ with a trusted WLAN. Configure and pair wireless debugging in Shizuku, allow its background startup, and verify a real reboot on the device. If automatic startup fails or its requirements are unavailable, start Shizuku manually.
+
+### Protection limits
+
+Anubis reacts to Android network callbacks and uses Shizuku to disable apps. There is a delay between a VPN disconnect and completion of the freeze. It cannot guarantee that a process never executes or sends traffic during that interval, during boot before Shizuku is ready, or while Anubis/Shizuku is stopped or denied permission. A detected VPN transport also does not prove that every destination used by a managed app is routed through it: configure the VPN's app and route lists accordingly.
+
+For OS-enforced blocking of non-VPN traffic, use Android's [always-on VPN with Block connections without VPN](https://developer.android.com/develop/connectivity/vpn#blocked-connections). This blocks traffic, not process execution, and also cuts network access for apps excluded from the VPN in that profile. Always-on alone does not enable this blocking.
+
+The Pause switch, manual unfreeze/recovery actions, and the Launch with VPN group intentionally allow exceptions to automatic freezing. Use VPN Only for apps that should be frozen when the VPN disconnects. These explicit user controls remain available.
+
+Boot freezing and monitoring share the same policy and lock. Boot freezing waits in the foreground service for Shizuku, preserves its pending request across process restart, and respects an already connected VPN. Monitoring retries unsuccessful freezes and reapplies rules after unpausing, Shizuku recovery, and the end of a dummy-VPN takeover. Launches recheck VPN state after unfreezing and launcher lookup; failed or cancelled launches refreeze the target.
+
+Package enabled-state changes are flushed to disk through Android's package manager before reporting success, including on Android 10. This prevents a quick reboot from reverting a recently completed freeze. Policy validation retries failed persistence even when the in-memory package state already appears frozen.
 
 ## Supported VPN Clients
 
@@ -154,6 +172,7 @@ This is standard Android IPC discovery, not reverse engineering of protected cod
 ```bash
 ./gradlew assembleDebug
 ./gradlew assembleRelease  # requires signing config
+./gradlew testDebugUnitTest lintDebug
 ```
 
 Create `signing.properties` in project root:
