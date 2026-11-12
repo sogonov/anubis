@@ -5,22 +5,19 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.content.edit
+import sgnv.anubis.app.settings.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import sgnv.anubis.app.AnubisApp
 import sgnv.anubis.app.R
 import sgnv.anubis.app.ui.MainActivity
-import sgnv.anubis.app.util.AppLogger
 
 /**
  * Foreground service that syncs stealth state with real VPN state while the UI is
@@ -36,11 +33,33 @@ import sgnv.anubis.app.util.AppLogger
 class VpnMonitorService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var monitoringJob: Job? = null
+    private val policyMonitor: VpnPolicyMonitor by lazy {
+        val app = applicationContext as AnubisApp
+        VpnPolicyMonitor(app, { !app.vpnClientManager.isOwnVpnNetwork(it) }, {
+            AppSettings.prefs(this).edit(commit = true) {
+                putBoolean(AppSettings.KEY_PENDING_BOOT_FREEZE, policyMonitor.bootPending.value)
+            }
+            StealthWidgetProvider.updateAllWidgets(applicationContext)
+            if (!policyMonitor.bootPending.value &&
+                !AppSettings.prefs(this)
+                    .getBoolean(AppSettings.KEY_BACKGROUND_MONITORING, false)) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+        }).also {
+            it.bootPending.value = AppSettings.prefs(this)
+                .getBoolean(AppSettings.KEY_PENDING_BOOT_FREEZE, false)
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> {
+            ACTION_START, ACTION_BOOT, null -> {
+                if (intent?.action == ACTION_BOOT) {
+                    AppSettings.prefs(this).edit(commit = true) { putBoolean(AppSettings.KEY_PENDING_BOOT_FREEZE, true) }
+                    policyMonitor.bootPending.value = true
+                }
                 startForeground(NOTIFICATION_ID, buildNotification())
                 startVpnMonitoring()
             }
@@ -48,6 +67,7 @@ class VpnMonitorService : Service() {
                 stopVpnMonitoring()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
+                return START_NOT_STICKY
             }
         }
         return START_STICKY
@@ -56,88 +76,14 @@ class VpnMonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startVpnMonitoring() {
-        if (networkCallback != null) return
+        if (monitoringJob?.isActive == true) return
 
-        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        val app = applicationContext as AnubisApp
-
-        val request = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
-            .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-            .build()
-
-        networkCallback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                // Skip our own force-disconnect dummy VPN — treating it as "external VPN ON"
-                // would re-freeze groups that disable() just unfroze.
-                if (isOwnVpnNetwork(cm, network)) return
-                if (StealthVpnService.dummyVpnInFlight) return
-                scope.launch {
-                    withTimeoutOrNull(APPLY_STATE_TIMEOUT_MS) {
-                        app.orchestrator.freezeOnly()
-                    }
-                    StealthWidgetProvider.updateAllWidgets(applicationContext)
-                }
-            }
-
-            override fun onLost(network: Network) {
-                if (isOwnVpnNetwork(cm, network)) return
-                if (StealthVpnService.dummyVpnInFlight) return
-                // Exclude the just-lost network: at the moment onLost is dispatched,
-                // the system may not have removed it from allNetworks yet. Without
-                // this, stillActive sees the dying network and we skip freezeVpnOnly
-                // — state gets stuck at ENABLED after external VPN crashes.
-                val stillActive = cm.allNetworks.any { n ->
-                    if (n == network) return@any false
-                    val caps = cm.getNetworkCapabilities(n) ?: return@any false
-                    caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
-                        !isOwnVpnNetwork(cm, n)
-                }
-                if (!stillActive) {
-                    scope.launch {
-                        withTimeoutOrNull(APPLY_STATE_TIMEOUT_MS) {
-                            app.orchestrator.freezeVpnOnly()
-                        }
-                        StealthWidgetProvider.updateAllWidgets(applicationContext)
-                    }
-                }
-            }
-        }
-
-        try {
-            cm.registerNetworkCallback(request, networkCallback!!)
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "registerNetworkCallback failed", e)
-        }
-    }
-
-    /**
-     * Identifies our own force-disconnect dummy VPN by its local-end address
-     * (`StealthVpnService.DUMMY_VPN_ADDRESS`, picked from the RFC 2544 benchmarking
-     * range so no real VPN provider can collide with it). Avoids
-     * `NetworkCapabilities.getOwnerUid()` because it's API 30+ and the call site is
-     * on ConnectivityThread, where `NoSuchMethodError` is raised at class
-     * verification before our try/catch can intercept it (#106, #118).
-     */
-    private fun isOwnVpnNetwork(cm: ConnectivityManager, network: Network): Boolean = try {
-        cm.getLinkProperties(network)?.linkAddresses?.any {
-            it.address.hostAddress == StealthVpnService.DUMMY_VPN_ADDRESS
-        } == true
-    } catch (e: Exception) {
-        AppLogger.e(TAG, "isOwnVpnNetwork failed", e)
-        false
+        monitoringJob = scope.launch { policyMonitor.run() }
     }
 
     private fun stopVpnMonitoring() {
-        networkCallback?.let {
-            try {
-                val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-                cm.unregisterNetworkCallback(it)
-            } catch (e: Exception) {
-                AppLogger.e(TAG, "unregisterNetworkCallback failed", e)
-            }
-            networkCallback = null
-        }
+        monitoringJob?.cancel()
+        monitoringJob = null
     }
 
     private fun buildNotification(): Notification {
@@ -163,19 +109,15 @@ class VpnMonitorService : Service() {
     }
 
     companion object {
-        private const val TAG = "VpnMonitorService"
         const val ACTION_START = "sgnv.anubis.app.START_MONITOR"
         const val ACTION_STOP = "sgnv.anubis.app.STOP_MONITOR"
         const val NOTIFICATION_ID = 1
 
-        // Per-binder-op timeout is 5 s (ShizukuManager.BINDER_OP_TIMEOUT_MS).
-        // With FREEZE_CONCURRENCY=2 and up to ~30 managed apps, worst case
-        // is ceil(30/2) * 5 s = 75 s — use 90 s as the ceiling for the whole op.
-        private const val APPLY_STATE_TIMEOUT_MS = 90_000L
+        private const val ACTION_BOOT = "sgnv.anubis.app.BOOT_MONITOR"
 
-        fun start(context: Context) {
+        fun start(context: Context, freezeOnBoot: Boolean = false) {
             val intent = Intent(context, VpnMonitorService::class.java).apply {
-                action = ACTION_START
+                action = if (freezeOnBoot) ACTION_BOOT else ACTION_START
             }
             context.startForegroundService(intent)
         }

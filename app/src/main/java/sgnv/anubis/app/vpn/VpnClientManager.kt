@@ -1,5 +1,6 @@
 package sgnv.anubis.app.vpn
 
+import sgnv.anubis.app.service.StealthVpnService
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -24,6 +25,10 @@ class VpnClientManager(
 
     private val _vpnActive = MutableStateFlow(false)
     val vpnActive: StateFlow<Boolean> = _vpnActive
+
+    private val networkStateLock = Any()
+    private val _applicableVpnNetworks = MutableStateFlow<Set<Network>>(emptySet())
+    val applicableVpnNetworks: StateFlow<Set<Network>> = _applicableVpnNetworks
 
     private val _activeVpnClient = MutableStateFlow<VpnClientType?>(null)
     val activeVpnClient: StateFlow<VpnClientType?> = _activeVpnClient
@@ -130,7 +135,7 @@ class VpnClientManager(
         // For custom clients: caller handles via force-stop
     }
 
-    suspend fun launchApp(packageName: String) {
+    suspend fun launchApp(packageName: String, canLaunch: () -> Boolean = { true }): Boolean {
         // After unfreezeApp the binder call returns immediately, but PackageManager's
         // launcher-intent cache lags briefly — getLaunchIntentForPackage returns null
         // for ~100–300 ms while PM rebuilds. Without polling, the first tap on a
@@ -145,15 +150,18 @@ class VpnClientManager(
             }
             intent
         }
-        if (launchIntent != null) {
+        if (launchIntent != null && canLaunch()) {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(launchIntent)
+            return true
         }
+        return false
     }
 
     fun startMonitoringVpn() {
+        if (networkCallback != null) return
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        _vpnActive.value = isVpnCurrentlyActive(cm)
+        refreshVpnState()
 
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
@@ -165,29 +173,25 @@ class VpnClientManager(
                 // No dummy-gate here: orchestrator's stop sequence reads vpnActive to decide
                 // fallback steps. If we hide our dummy, waitForVpnOff exits early and
                 // launchLocal unfreezes with the external VPN still up (issue #63).
-                _vpnActive.value = true
+                updateVpnNetworks { it + network }
                 AppLogger.i(TAG, "VPN network available: id=${network.hashCode()}")
                 CoroutineScope(Dispatchers.IO).launch { detectActiveVpnClient() }
             }
 
             override fun onLost(network: Network) {
-                // Exclude the just-lost network: at the moment onLost is dispatched,
-                // the system may not have removed it from allNetworks yet, so without
-                // this the check sees the dying network and _vpnActive stays true.
-                val stillActive = isVpnCurrentlyActive(cm, exclude = network)
-                _vpnActive.value = stillActive
+                // Callback networks apply to this app/profile. A system-wide scan
+                // also sees work VPNs and may still include the just-lost network.
+                updateVpnNetworks { it - network }
+                val stillActive = _vpnActive.value
                 AppLogger.i(TAG, "VPN network lost: id=${network.hashCode()}, stillActive=$stillActive")
-                if (!stillActive) {
-                    _activeVpnClient.value = null
-                    _activeVpnPackage.value = null
-                }
             }
         }
 
         try {
             cm.registerNetworkCallback(request, networkCallback!!)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to register VPN network callback", e)
+            networkCallback = null
+            AppLogger.e(TAG, "registerNetworkCallback failed", e)
         }
     }
 
@@ -204,8 +208,64 @@ class VpnClientManager(
     }
 
     fun refreshVpnState() {
+        // Once registered, callbacks own the network set. A synchronous snapshot can
+        // lag both onLost and a handover's onAvailable; it must neither resurrect the
+        // former nor erase the replacement before its default route becomes visible.
+        if (networkCallback != null) return
+        val active = currentVpnNetwork()
+        updateVpnNetworks { if (active == null) emptySet() else setOf(active) }
+    }
+
+    private fun currentVpnNetwork(): Network? {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        _vpnActive.value = isVpnCurrentlyActive(cm)
+        val network = cm.activeNetwork
+        return network?.takeIf {
+            cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+        }
+    }
+
+    /** A launch needs agreement between our callbacks and Android's current route. */
+    fun isVpnAvailableForLaunch(requiresVpn: Boolean): Boolean {
+        if (StealthVpnService.dummyVpnInFlight) return false
+        val current = currentVpnNetwork()
+        return if (requiresVpn) {
+            current != null && current in _applicableVpnNetworks.value && !isOwnVpnNetwork(current)
+        } else {
+            current == null && _applicableVpnNetworks.value.isEmpty()
+        }
+    }
+
+    /**
+     * Identifies our own force-disconnect dummy VPN by its local-end address
+     * (`StealthVpnService.DUMMY_VPN_ADDRESS`, from the RFC 2544 benchmarking range
+     * so it does not collide with a real VPN provider). Avoids the API 30+
+     * NetworkCapabilities.getOwnerUid() accessor so Android 10 remains supported;
+     * on that version NoSuchMethodError can occur before a catch can handle it
+     * when a class referring to that accessor is verified (#106, #118).
+     */
+    internal fun isOwnVpnNetwork(network: Network): Boolean = try {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        cm.getLinkProperties(network)?.linkAddresses?.any {
+            it.address.hostAddress == StealthVpnService.DUMMY_VPN_ADDRESS
+        } == true
+    } catch (e: Exception) {
+        AppLogger.e(TAG, "isOwnVpnNetwork failed", e)
+        false
+    }
+
+    fun isExternalVpnActive(): Boolean =
+        !StealthVpnService.dummyVpnInFlight && _applicableVpnNetworks.value.any { !isOwnVpnNetwork(it) }
+
+    private fun updateVpnNetworks(update: (Set<Network>) -> Set<Network>) {
+        synchronized(networkStateLock) {
+            val networks = update(_applicableVpnNetworks.value)
+            _vpnActive.value = networks.isNotEmpty()
+            _applicableVpnNetworks.value = networks
+            if (networks.isEmpty()) {
+                _activeVpnClient.value = null
+                _activeVpnPackage.value = null
+            }
+        }
     }
 
     /**
@@ -244,42 +304,10 @@ class VpnClientManager(
     }
 
     private suspend fun getVpnOwnerByDumpsys(): String? {
-        // Exclude our own dummy VPN (StealthVpnService) from OwnerUid candidates —
-        // otherwise after disable() dumpsys can still list our dummy first and we'd
-        // report ourselves as the active external VPN client.
-        val myUid = android.os.Process.myUid()
-
-        // Extract OwnerUid directly from the VPN network section.
-        // On A11 the VPN entry has "type: VPN[" in its NetworkAgentInfo.
-        // We grep for that (NOT "NOT_VPN"), then find OwnerUid nearby.
-        val uidStr = shizukuManager.runCommandWithOutput(
-            "sh", "-c",
-            "dumpsys connectivity 2>/dev/null | grep -A 30 'type: VPN\\[' | grep -oE 'OwnerUid: [0-9]+' | grep -v 'OwnerUid: $myUid' | head -1 | grep -oE '[0-9]+'"
-        )
-
-        var uid = uidStr?.trim()?.toIntOrNull()
-
-        // Fallback: try "Transports: VPN" pattern (newer Android format)
-        if (uid == null || uid <= 0) {
-            val uidStr2 = shizukuManager.runCommandWithOutput(
-                "sh", "-c",
-                "dumpsys connectivity 2>/dev/null | grep -A 10 'Transports: VPN' | grep -oE 'OwnerUid: [0-9]+' | grep -v 'OwnerUid: $myUid' | head -1 | grep -oE '[0-9]+'"
-            )
-            uid = uidStr2?.trim()?.toIntOrNull()
-        }
-
-        if (uid != null && uid > 0) {
-            val pkgOutput = shizukuManager.runCommandWithOutput(
-                "sh", "-c",
-                "pm list packages --uid $uid 2>/dev/null | head -1"
-            )?.trim()
-            val pkg = pkgOutput?.removePrefix("package:")?.split("\\s+".toRegex())?.firstOrNull()?.trim()
-            // Second line of defense: if the resolved package is ours anyway
-            // (shared UID, unexpected dumpsys formatting), drop it.
-            if (!pkg.isNullOrBlank() && pkg != context.packageName) return pkg
-        }
-
-        return null
+        val dump = shizukuManager.runCommandWithOutput("dumpsys", "connectivity") ?: return null
+        val uid = VpnOwnerResolver.ownerUid(dump, android.os.Process.myUid()) ?: return null
+        return context.packageManager.getPackagesForUid(uid)
+            ?.firstOrNull { it != context.packageName }
     }
 
     private suspend fun getVpnOwnerByForegroundService(): String? {
@@ -293,25 +321,6 @@ class VpnClientManager(
             }
         }
         return null
-    }
-
-    private fun isVpnCurrentlyActive(cm: ConnectivityManager, exclude: Network? = null): Boolean {
-        // Don't gate on dummyVpnInFlight here: orchestrator.waitForVpnOff() relies on this
-        // to see the real picture. If we pretend no VPN is active while our dummy + the
-        // external VPN are both in the list, waitForVpnOff returns true instantly,
-        // Step 3 force-stop is skipped, and launchLocal proceeds with the external VPN
-        // still running (regression in v0.1.4, issue #63). The dummy-vs-external
-        // distinction is only needed in VpnMonitorService — see the guard there.
-        // `exclude` is used by onLost to skip the network being lost (see callsite).
-        return try {
-            cm.allNetworks.any { network ->
-                if (network == exclude) return@any false
-                cm.getNetworkCapabilities(network)
-                    ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-            }
-        } catch (e: Exception) {
-            false
-        }
     }
 
     companion object {

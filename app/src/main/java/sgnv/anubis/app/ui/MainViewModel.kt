@@ -182,12 +182,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (active != prevActive) {
                     prevActive = active
 
-                    if (active) {
-                        // VPN turned ON (possibly outside Anubis) — freeze LOCAL apps
-                        orchestrator.freezeOnly()
-                    } else {
-                        // VPN turned OFF — freeze VPN_ONLY apps
-                        orchestrator.freezeVpnOnly()
+                    // With monitoring enabled the service applies this shared state.
+                    if (!_backgroundMonitoring.value) {
+                        if (active) {
+                            orchestrator.freezeOnly()
+                        } else {
+                            orchestrator.freezeVpnOnly()
+                        }
                     }
 
                     orchestrator.syncState()

@@ -16,6 +16,7 @@ import sgnv.anubis.app.vpn.VpnControlMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -184,15 +185,7 @@ class StealthOrchestrator(
             if (!finished) {
                 job.cancel()  // best-effort; sync binder won't actually interrupt
             }
-            // Cancellation can come from two sources: our own timeout above, or
-            // cancelOngoing() invoked by the UI cancel button. Both leave the same
-            // mid-enable side effects to undo: LOCAL_AUTO_UNFREEZE was eagerly
-            // frozen by enableImpl before the VPN was confirmed up, and the idle-
-            // frozen client was unfrozen earlier. applyManagedStateForVpn(false) is
-            // the canonical "DISABLED state" application (re-freezes the client,
-            // unfreezes LOCAL_AUTO_UNFREEZE) — running it here gets the system back
-            // into a coherent shape. fail() inside enableImpl already covers the
-            // non-cancelled timeout/failure paths.
+            // Reconcile against the current network: cancellation does not prove VPN shutdown.
             if (job.isCancelled) {
                 _progressText.value = null
                 _lastError.value = if (!finished) {
@@ -200,7 +193,7 @@ class StealthOrchestrator(
                 } else {
                     "Операция отменена."
                 }
-                applyManagedStateForVpn(active = false)
+                applyManagedStateForVpn()
             }
         } finally {
             currentJob = null
@@ -229,7 +222,12 @@ class StealthOrchestrator(
         val mutex = (context.applicationContext as AnubisApp).groupOpMutex
         val benchStart = System.currentTimeMillis()
         val frozen = mutex.withLock {
-            freezeGroup(AppGroup.LOCAL) + freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
+            val count = freezeGroup(AppGroup.LOCAL) + freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
+            if (!isGroupFrozen(AppGroup.LOCAL) || !isGroupFrozen(AppGroup.LOCAL_AUTO_UNFREEZE)) null else count
+        }
+        if (frozen == null) {
+            _progressText.value = null
+            return
         }
         emitBenchmark(frozen = frozen, unfrozen = 0, startMs = benchStart)
 
@@ -329,7 +327,7 @@ class StealthOrchestrator(
         _progressText.value = "Размораживаю..."
         _state.value = StealthState.UNFREEZING
         // After confirmed VPN shutdown, align managed groups with the new network state.
-        applyManagedStateForVpn(active = false)
+        applyManagedStateForVpn()
         _progressText.value = null
     }
 
@@ -350,28 +348,24 @@ class StealthOrchestrator(
     /**
      * VPN already active on app start — just freeze LOCAL.
      */
-    suspend fun freezeOnly() {
-        _lastError.value = null
+    suspend fun freezeOnly(): Boolean = reconcileVpnState()
+
+    suspend fun freezeVpnOnly(): Boolean = reconcileVpnState()
+
+    suspend fun reconcileVpnState(): Boolean {
         if (_paused.value) {
-            AppLogger.i(TAG, "freezeOnly skipped: orchestrator paused")
-            return
+            AppLogger.i(TAG, "VPN policy skipped: orchestrator paused")
+            return false
         }
-        if (!checkShizuku()) return
-        // Handle external/manual VPN activation using the same managed-group rules.
-        applyManagedStateForVpn(active = true)
+        _lastError.value = null
+        if (!checkShizuku()) return false
+        return applyManagedStateForVpn()
     }
 
-    /**
-     * VPN turned OFF — freeze VPN_ONLY group.
-     */
-    suspend fun freezeVpnOnly() {
-        if (_paused.value) {
-            AppLogger.i(TAG, "freezeVpnOnly skipped: orchestrator paused")
-            return
-        }
-        if (!checkShizuku()) return
-        // Handle external/manual VPN shutdown using the same managed-group rules.
-        applyManagedStateForVpn(active = false)
+    /** Boot freeze and ongoing monitoring use the same lock and network policy. */
+    suspend fun freezeOnBoot(): Boolean {
+        if (!checkShizuku()) return false
+        return applyManagedStateForVpn(freezeOnBoot = true)
     }
 
     /**
@@ -381,45 +375,59 @@ class StealthOrchestrator(
     suspend fun launchWithVpn(packageName: String, vpnClient: SelectedVpnClient) {
         _lastError.value = null
 
-        if (_state.value != StealthState.ENABLED) {
-            enable(vpnClient)
-            if (_state.value != StealthState.ENABLED) return
-        }
-
-        if (shizukuManager.isAppFrozen(packageName)) {
-            val result = shizukuManager.unfreezeApp(packageName)
-            logShizukuFailure("launchWithVpn.unfreezeApp", packageName, result)
-            bumpVersion()
-        }
-
-        vpnClientManager.launchApp(packageName)
+        vpnClientManager.refreshVpnState()
+        if (!vpnClientManager.isVpnAvailableForLaunch(true)) enable(vpnClient)
+        launchGuarded(packageName, requiresVpn = true)
     }
 
-    /**
-     * Launch LOCAL app: stop VPN → freeze VPN_ONLY → unfreeze app → launch.
-     */
+    /** Launch a local app only after confirming VPN shutdown. */
     suspend fun launchLocal(
         packageName: String,
         vpnClient: SelectedVpnClient,
         detectedPackage: String?
     ) {
         _lastError.value = null
+        vpnClientManager.refreshVpnState()
+        if (!vpnClientManager.isVpnAvailableForLaunch(false)) disable(vpnClient, detectedPackage)
+        launchGuarded(packageName, requiresVpn = false)
+    }
 
-        if (_state.value == StealthState.ENABLED || vpnClientManager.vpnActive.value) {
-            disable(vpnClient, detectedPackage)
-            if (vpnClientManager.vpnActive.value) {
-                _lastError.value = "Не удалось отключить VPN. Приложение не запущено. Проверьте, что Anubis имеет разрешение VPN, и что выбран правильный VPN-клиент."
-                return
+    private suspend fun launchGuarded(packageName: String, requiresVpn: Boolean) {
+        if (!checkShizuku() || !applyManagedStateForVpn()) return
+        val mutex = (context.applicationContext as AnubisApp).groupOpMutex
+        mutex.withLock {
+            fun allowed(): Boolean {
+                vpnClientManager.refreshVpnState()
+                return vpnClientManager.isVpnAvailableForLaunch(requiresVpn)
+            }
+            if (!allowed()) {
+                _lastError.value = if (requiresVpn) {
+                    "VPN не подключён. Приложение не запущено. Проверьте VPN-клиент и включение Anubis в его список приложений."
+                } else {
+                    "Не удалось отключить VPN. Приложение не запущено. Проверьте, что Anubis имеет разрешение VPN, и что выбран правильный VPN-клиент."
+                }
+                logShizukuFailure("launchGuarded.freezeApp", packageName, shizukuManager.freezeApp(packageName))
+                return@withLock
+            }
+            var launched = false
+            try {
+                if (shizukuManager.isAppFrozen(packageName)) {
+                    val result = shizukuManager.unfreezeApp(packageName)
+                    logShizukuFailure("launchGuarded.unfreezeApp", packageName, result)
+                    if (result.isFailure) return@withLock
+                    bumpVersion()
+                }
+                // Recheck after the binder operation AND after launcher-intent polling.
+                launched = vpnClientManager.launchApp(packageName, ::allowed)
+                if (!launched) _lastError.value = "Запуск отменён: VPN изменился или приложение недоступно."
+            } finally {
+                // Cancellation (including Activity destruction) must not leave the target enabled.
+                if (!launched) withContext(NonCancellable) {
+                    logShizukuFailure("launchGuarded.refreezeApp", packageName, shizukuManager.freezeApp(packageName))
+                    bumpVersion()
+                }
             }
         }
-
-        if (shizukuManager.isAppFrozen(packageName)) {
-            val result = shizukuManager.unfreezeApp(packageName)
-            logShizukuFailure("launchLocal.unfreezeApp", packageName, result)
-            bumpVersion()
-        }
-
-        vpnClientManager.launchApp(packageName)
     }
 
     /**
@@ -476,8 +484,8 @@ class StealthOrchestrator(
     }
 
     private suspend fun checkShizuku(): Boolean {
-        if (!shizukuManager.isAvailable()) { fail("Shizuku не запущен."); return false }
-        if (!shizukuManager.hasPermission()) { fail("Нет разрешения Shizuku."); return false }
+        if (!shizukuManager.isAvailable()) { _lastError.value = "Shizuku не запущен."; return false }
+        if (!shizukuManager.hasPermission()) { _lastError.value = "Нет разрешения Shizuku."; return false }
         return true
     }
 
@@ -504,12 +512,27 @@ class StealthOrchestrator(
         return counter.get()
     }
 
+    private suspend fun isGroupFrozen(group: AppGroup): Boolean {
+        val packages = repository.getPackagesByGroup(group)
+        if (packages.isEmpty()) return true
+        for (pkg in packages) {
+            if (shizukuManager.isAppInstalled(pkg) && !shizukuManager.isAppFrozen(pkg)) {
+                _lastError.value = "Не удалось заморозить $pkg."
+                return false
+            }
+        }
+        val persisted = shizukuManager.persistPackageState()
+        logShizukuFailure("isGroupFrozen.persistPackageState", group.name, persisted)
+        return persisted.isSuccess
+    }
+
     private suspend fun unfreezeGroup(group: AppGroup): Int {
         val packages = repository.getPackagesByGroup(group).toList()
         if (AppSettings.shouldUseLauncherSafeMode(context)) {
             var transitioned = 0
             packages.forEachIndexed { index, pkg ->
-                if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
+                if (!vpnClientManager.vpnActive.value && !StealthVpnService.dummyVpnInFlight &&
+                    shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
                     val result = shizukuManager.unfreezeApp(pkg)
                     logShizukuFailure("unfreezeGroup.unfreezeApp", pkg, result)
                     if (result.isSuccess) {
@@ -530,7 +553,8 @@ class StealthOrchestrator(
             packages.map { pkg ->
                 async {
                     sem.withPermit {
-                        if (shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
+                        if (!vpnClientManager.vpnActive.value && !StealthVpnService.dummyVpnInFlight &&
+                            shizukuManager.isAppInstalled(pkg) && shizukuManager.isAppFrozen(pkg)) {
                             val result = shizukuManager.unfreezeApp(pkg)
                             logShizukuFailure("unfreezeGroup.unfreezeApp", pkg, result)
                             if (result.isSuccess) {
@@ -558,20 +582,29 @@ class StealthOrchestrator(
         _benchmark.tryEmit(msg)
     }
 
-    private suspend fun applyManagedStateForVpn(active: Boolean) {
+    private suspend fun applyManagedStateForVpn(freezeOnBoot: Boolean = false): Boolean {
         val mutex = (context.applicationContext as AnubisApp).groupOpMutex
         val benchStart = System.currentTimeMillis()
         var frozen = 0
         var unfrozen = 0
+        var succeeded = true
         mutex.withLock {
+            suspend fun freeze(group: AppGroup) {
+                frozen += freezeGroup(group)
+                if (!isGroupFrozen(group)) succeeded = false
+            }
+            if (freezeOnBoot) {
+                freeze(AppGroup.LOCAL)
+                freeze(AppGroup.VPN_ONLY)
+            }
+            // Read after acquiring the lock: a queued operation may outlive a VPN change.
+            val active = vpnClientManager.isExternalVpnActive() || StealthVpnService.dummyVpnInFlight
             if (active) {
-                frozen += freezeGroup(AppGroup.LOCAL)
-                // LOCAL_AUTO_UNFREEZE: freeze unconditionally when VPN comes up — that's the whole point of the group.
-                frozen += freezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
+                freeze(AppGroup.LOCAL)
+                freeze(AppGroup.LOCAL_AUTO_UNFREEZE)
                 _state.value = StealthState.ENABLED
             } else {
-                frozen += freezeGroup(AppGroup.VPN_ONLY)
-                // LOCAL_AUTO_UNFREEZE: unfreeze unconditionally when VPN goes down — that's the whole point of the group.
+                freeze(AppGroup.VPN_ONLY)
                 unfrozen += unfreezeGroup(AppGroup.LOCAL_AUTO_UNFREEZE)
                 freezeSelectedVpnClientIfNeeded()
                 _state.value = StealthState.DISABLED
@@ -579,6 +612,7 @@ class StealthOrchestrator(
         }
         emitBenchmark(frozen = frozen, unfrozen = unfrozen, startMs = benchStart)
         bumpVersion()
+        return succeeded
     }
 
     private suspend fun waitForVpnOff(timeoutMs: Long): Boolean {
@@ -596,22 +630,15 @@ class StealthOrchestrator(
         repeat(steps) {
             delay(200)
             vpnClientManager.refreshVpnState()
-            if (vpnClientManager.vpnActive.value) return true
+            if (vpnClientManager.isVpnAvailableForLaunch(true)) return true
         }
         return false
     }
 
     private suspend fun fail(message: String) {
         _progressText.value = null
-        // Restore the DISABLED state cleanly. enableImpl froze LOCAL and
-        // LOCAL_AUTO_UNFREEZE before starting the VPN — if startVPN errors or
-        // waitForVpnOn times out, those groups stay frozen even though the user
-        // is back to a VPN-off state where LOCAL_AUTO_UNFREEZE should be thawed
-        // (#99 — "apps stayed frozen after a failed VPN start"). The canonical
-        // DISABLED-state application (re-freeze idle client, unfreeze
-        // LOCAL_AUTO_UNFREEZE, set _state) handles all of it; it's the same path
-        // we run on user-cancelled enable().
-        applyManagedStateForVpn(active = false)
+        // A failed start/stop does not prove that an existing tunnel disappeared.
+        applyManagedStateForVpn()
         _lastError.value = message
     }
 
@@ -625,6 +652,7 @@ class StealthOrchestrator(
 
     private fun logShizukuFailure(op: String, packageName: String, result: Result<Unit>) {
         if (result.isFailure) {
+            _lastError.value = "$op: $packageName: ${result.exceptionOrNull()?.message}"
             AppLogger.e(TAG, "$op failed for package=$packageName", result.exceptionOrNull())
         }
     }

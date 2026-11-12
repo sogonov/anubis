@@ -97,6 +97,9 @@ android {
         aidl = true
         buildConfig = true
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 androidComponents {
@@ -106,6 +109,9 @@ androidComponents {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.mockito:mockito-core:5.24.0")
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.05.00")
     implementation(composeBom)

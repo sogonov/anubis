@@ -1,5 +1,7 @@
 package sgnv.anubis.app.service
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
@@ -86,9 +88,11 @@ class StealthVpnService : VpnService() {
          * detection paths must ignore VPN transports while this flag is set, otherwise
          * we'll treat our own force-disconnect VPN as an external VPN coming up.
          */
-        @Volatile
-        var dummyVpnInFlight: Boolean = false
-            private set
+        private val _dummyVpnState = MutableStateFlow(false)
+        val dummyVpnState: StateFlow<Boolean> = _dummyVpnState
+        var dummyVpnInFlight: Boolean
+            get() = _dummyVpnState.value
+            private set(value) { _dummyVpnState.value = value }
 
         private const val DUMMY_GRACE_MS = 1500L
 
@@ -108,7 +112,12 @@ class StealthVpnService : VpnService() {
             val intent = Intent(context, StealthVpnService::class.java).apply {
                 action = ACTION_DISCONNECT
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                dummyVpnInFlight = false
+                throw e
+            }
         }
     }
 }

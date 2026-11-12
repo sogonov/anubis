@@ -214,6 +214,16 @@ class ShizukuManager(private val packageManager: PackageManager) {
         }
     }
 
+    /** Also retries persistence when a previous freeze changed RAM but its flush failed. */
+    suspend fun persistPackageState(): Result<Unit> =
+        withTimeoutOrNull(BINDER_OP_TIMEOUT_MS) {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    flushPackageState(asInterface("android.content.pm.IPackageManager", "package"), currentUserId)
+                }
+            }
+        } ?: Result.failure(RuntimeException("persistPackageState timed out"))
+
     fun isAppInstalled(packageName: String): Boolean {
         return try {
             packageManager.getApplicationInfo(packageName, 0)
@@ -271,20 +281,7 @@ class ShizukuManager(private val packageManager: PackageManager) {
     private fun setAppEnabledState(packageName: String, enabled: Boolean): Result<Unit> =
         runCatching {
             val pm = asInterface("android.content.pm.IPackageManager", "package")
-            val newState = if (enabled) {
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            } else {
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER
-            }
-            // setApplicationEnabledSetting(String pkg, int newState, int flags, int userId, String callingPackage)
-            pm::class.java.getMethod(
-                "setApplicationEnabledSetting",
-                String::class.java,
-                Int::class.java,
-                Int::class.java,
-                Int::class.java,
-                String::class.java
-            ).invoke(pm, packageName, newState, 0, currentUserId, CALLER_PACKAGE)
+            setAppEnabledStatePersistently(pm, packageName, enabled, currentUserId, CALLER_PACKAGE)
         }
 
     private fun forceStopInternal(packageName: String): Result<Unit> = runCatching {
